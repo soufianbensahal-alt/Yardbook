@@ -215,6 +215,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const remoteUpdatedAt = useRef<string>('')
   const lastSyncedState = useRef(JSON.stringify(state))
   const lastRefreshAt = useRef(0)
+  const lastRemoteSuccessAt = useRef(0)
+  const hydrateRequestId = useRef(0)
   const stateRef = useRef(state)
 
   useEffect(() => { stateRef.current = state }, [state])
@@ -232,6 +234,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     const work=(async()=>{
       const remote=await saveRemoteChanges(snapshot,base,currentSession)
       if(getRemoteOwnerId(readRemoteSession())!==getRemoteOwnerId(currentSession))return
+      lastRemoteSuccessAt.current=Date.now()
       const merged=mergeFleetState(snapshot,stateRef.current,remote.state)
       remoteUpdatedAt.current=remote.updated_at
       lastSyncedState.current=JSON.stringify(remote.state)
@@ -256,10 +259,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const hydrateFromRemote = useCallback(async (currentSession = session) => {
     if (!remoteEnabled || !currentSession) return
+    const requestId=++hydrateRequestId.current
     const cacheKey = storageKeyForSession(currentSession)
     setSyncStatus('loading')
     try {
       const remote = await fetchRemoteState(currentSession)
+      if(requestId!==hydrateRequestId.current)return
       if (remote) {
         const remoteState = normalizeState(remote.state)
         const cached=readCachedState(cacheKey,false)
@@ -284,10 +289,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         lastSyncedState.current = persistCachedState(cacheKey, cachedState)
         remoteUpdatedAt.current = await saveRemoteState(cachedState, currentSession)
       }
+      lastRemoteSuccessAt.current=Date.now()
       hydrated.current = true
       setSyncStatus('online')
       setSyncError('')
     } catch (error) {
+      if(requestId!==hydrateRequestId.current)return
       hydrated.current = true
       if (!readRemoteSession()) {
         saveRemoteSession(null)
@@ -365,6 +372,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(storageKeyForSession(session), lastSyncedState.current)
           localStorage.setItem(`${storageKeyForSession(session)}:synced`,lastSyncedState.current)
         }
+        lastRemoteSuccessAt.current=Date.now()
         setSyncStatus('online')
         setSyncError('')
       } catch (error) {
@@ -457,13 +465,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     const storedSession = initialSessionForValidation.current
     if (!remoteEnabled || !storedSession?.refreshToken) return
     let cancelled = false
+    const validationStartedAt=Date.now()
     const validate = async () => {
       const nextSession = await refreshRemoteSession(storedSession)
       if (cancelled) return
       if (nextSession) setSession(nextSession)
       else clearRemoteLogin('La sesión ha caducado o se ha cerrado desde otro dispositivo.')
     }
-    void validate().catch(()=>{if(!cancelled){setSyncStatus('offline');setSyncError('No se ha podido comprobar la sesión. Se conserva la caché hasta recuperar la conexión.')}})
+    void validate().catch(()=>{if(!cancelled&&lastRemoteSuccessAt.current<=validationStartedAt){setSyncStatus('offline');setSyncError('No se ha podido comprobar la sesión. Se conserva la caché hasta recuperar la conexión.')}})
     return () => { cancelled = true }
   }, [clearRemoteLogin])
 
@@ -486,6 +495,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       }
     } else await hydrateFromRemote(session)
   }, [hydrateFromRemote, session,persistChanges])
+
+  useEffect(()=>{
+    if(!session||syncStatus!=='offline')return
+    const interval=window.setInterval(()=>void retrySync(),15000)
+    return()=>window.clearInterval(interval)
+  },[session,syncStatus,retrySync])
 
   const value = useMemo(() => ({
     state, syncStatus, syncError, remoteEnabled, authEmail:session?.email, rememberSession,

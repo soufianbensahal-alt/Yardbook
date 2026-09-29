@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { FleetProvider } from '../store/FleetContext'
 import { AppLayout } from './AppLayout'
@@ -84,5 +85,18 @@ describe('Modal',()=>{
     expect(dialog).toHaveClass('fixed','inset-0','h-dvh','w-screen','items-center','justify-center','z-[1000]')
     expect(dialog.firstElementChild).toHaveClass('max-h-[calc(100dvh-1.5rem)]','max-w-2xl','flex-col','overflow-hidden')
     expect(screen.getByText('Formulario').parentElement).toHaveClass('overflow-y-auto','overscroll-contain')
+  })
+
+  it('mantiene el foco del campo cuando el formulario se vuelve a renderizar',()=>{
+    function FormModal(){
+      const [value,setValue]=useState('')
+      return <Modal title="Editar" onClose={()=>{}}><label>Dato<input aria-label="Dato" value={value} onChange={event=>setValue(event.target.value)}/></label></Modal>
+    }
+    render(<FormModal/>)
+    const input=screen.getByRole('textbox',{name:'Dato'})
+    input.focus()
+    fireEvent.change(input,{target:{value:'abc'}})
+    expect(input).toHaveValue('abc')
+    expect(input).toHaveFocus()
   })
 })

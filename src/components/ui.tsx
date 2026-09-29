@@ -20,14 +20,16 @@ export function StatCard({ label, value, detail, icon:Icon, tone='orange', value
 
 export function Modal({ title, children, onClose }: { title:string; children:ReactNode; onClose:()=>void }) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseRef.current() }
     document.addEventListener('keydown', closeOnEscape)
     panelRef.current?.focus()
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', closeOnEscape) }
-  }, [onClose])
+  }, [])
   const modal = <div className="fixed inset-0 z-[1000] flex h-dvh w-screen items-center justify-center overflow-hidden bg-stone-950/55 p-3 backdrop-blur-[2px] sm:p-6" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
     <div ref={panelRef} tabIndex={-1} className="modal-panel flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-[0_24px_80px_rgba(28,25,23,.28)] outline-none sm:max-h-[calc(100dvh-3rem)] sm:rounded-3xl">
       <div className="modal-header flex shrink-0 items-center justify-between border-b border-orange-100 bg-white px-5 py-4 sm:px-7 sm:py-5"><h2 id="modal-title" className="font-display text-xl font-bold text-ink sm:text-2xl">{title}</h2><button className="icon-btn shrink-0" onClick={onClose} aria-label="Cerrar"><X size={20}/></button></div>
