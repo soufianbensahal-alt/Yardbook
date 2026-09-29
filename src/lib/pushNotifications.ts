@@ -1,4 +1,4 @@
-import { callNotificationService } from './remoteStore'
+import { callNotificationService, getRemoteOwnerId, readRemoteSession } from './remoteStore'
 export function supportsPush() { return typeof window!=='undefined' && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window && window.isSecureContext }
 async function registration() {await navigator.serviceWorker.register('/notification-sw.js',{scope:'/'});return navigator.serviceWorker.ready}
 async function bindOwner(reg:ServiceWorkerRegistration,owner:string|null) {
@@ -22,17 +22,13 @@ export async function enableDevice(owner:string) {
   const raw=atob(info.publicKey.replace(/-/g,'+').replace(/_/g,'/'))
   const key=Uint8Array.from(raw,c=>c.charCodeAt(0))
   let subscription=await reg.pushManager.getSubscription()
-  if(subscription) {
-    await callNotificationService({action:'unsubscribe',endpoint:subscription.endpoint})
-    await subscription.unsubscribe()
-  }
-  subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key})
-  try {
-    await callNotificationService({action:'subscribe',subscription:subscription.toJSON()})
-    await bindOwner(reg,owner)
-  } catch(error) {await subscription.unsubscribe();throw error}
+  if(!subscription)subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key})
+  await callNotificationService({action:'subscribe',subscription:subscription.toJSON(),...deviceInfo()})
+  await bindOwner(reg,owner)
+  localStorage.setItem(`monkey-push-enabled:${owner}`,'true')
 }
 export async function disableDevice() {
+  const owner=getRemoteOwnerId(readRemoteSession());if(owner)localStorage.removeItem(`monkey-push-enabled:${owner}`)
   if(!('serviceWorker' in navigator))return
   const reg=await navigator.serviceWorker.getRegistration('/')
   if(!reg)return
@@ -45,6 +41,7 @@ export async function disableDevice() {
   for(const notification of await reg.getNotifications())notification.close()
 }
 export async function clearDeviceOnLogout() {
+  const owner=getRemoteOwnerId(readRemoteSession());if(owner)localStorage.removeItem(`monkey-push-enabled:${owner}`)
   if(!('serviceWorker' in navigator))return
   const reg=await navigator.serviceWorker.getRegistration('/')
   if(!reg)return
@@ -58,4 +55,24 @@ export async function deviceIsActive() {
   const sub=await reg?.pushManager.getSubscription()
   if(!sub)return false
   return Boolean((await callNotificationService({action:'status',endpoint:sub.endpoint})).active)
+}
+
+function deviceInfo() {
+  const platform=/iPad|iPhone/.test(navigator.userAgent)?'iOS':/Android/.test(navigator.userAgent)?'Android':/Macintosh/.test(navigator.userAgent)?'macOS':'PC'
+  return {platform,deviceName:`${platform} · ${window.matchMedia('(display-mode: standalone)').matches?'App instalada':'Navegador'}`}
+}
+// Rebind an existing subscription after session renewal; never prompt or enable a new device silently.
+export async function reconcileDevice(owner:string) {
+  if(!supportsPush()||Notification.permission!=='granted')return
+  const reg=await registration()
+  let sub=await reg.pushManager.getSubscription()
+  if(!sub){
+    if(localStorage.getItem(`monkey-push-enabled:${owner}`)!=='true')return
+    const info=await callNotificationService({action:'config'});if(!info.publicKey)return
+    const key=Uint8Array.from(atob(info.publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))
+    sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key})
+  }
+  await callNotificationService({action:'subscribe',subscription:sub.toJSON(),...deviceInfo()})
+  await bindOwner(reg,owner)
+  localStorage.setItem(`monkey-push-enabled:${owner}`,'true')
 }

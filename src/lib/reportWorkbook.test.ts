@@ -29,11 +29,11 @@ const sheet = (sheets: ReportSheet[], name: string) => sheets.find(s => s.sheet 
 const total = (s: ReportSheet, label: string) => values(s).find(row => row[0] === label)?.filter(value => value !== undefined).at(-1)
 
 describe('Excel completo de Informes', () => {
-  it('incluye las 12 hojas y reconcilia los indicadores con Informes sin duplicar flexibles', () => {
+  it('incluye las 15 hojas y reconcilia los indicadores con Informes sin duplicar flexibles', () => {
     const state = fixture()
     const snapshot = structuredClone(state)
     const sheets = buildReportWorkbook(state, today, 'owner@example.test')
-    expect(sheets.map(s => s.sheet)).toEqual(['Resumen', 'Ingresos', 'Pagos pendientes', 'Pagos atrasados', 'Gastos', 'Vehículos', 'Clientes', 'Alquileres', 'Mantenimiento', 'ITV y documentación', 'Multas e impuestos', 'Últimos movimientos'])
+    expect(sheets.map(s => s.sheet)).toEqual(['Resumen', 'Ingresos', 'Pagos pendientes', 'Pagos atrasados', 'Gastos', 'Vehículos', 'Clientes', 'Alquileres', 'Mantenimiento', 'ITV y documentación', 'Multas e impuestos', 'Últimos movimientos', 'Materiales y repuestos', 'Deudas', 'Pagos de deuda'])
     const summary = sheet(sheets, 'Resumen')
     const report = buildReport(state, today)
     expect(total(summary, 'Ingresos cobrados')).toBe(report.summary.totalPaid)
@@ -71,7 +71,7 @@ describe('Excel completo de Informes', () => {
     expect(JSON.stringify(empty)).toContain('No hay datos suficientes para generar un informe completo.')
     state.customers = fixture().customers
     const partial = buildReportWorkbook(state, today)
-    expect(partial).toHaveLength(12)
+    expect(partial).toHaveLength(15)
     expect(total(sheet(partial, 'Clientes'), 'Total clientes')).toBe(1)
     const debtRow = sheet(partial, 'Resumen').data.find(row => (row[0] as CellObject)?.value === 'Dinero atrasado')!
     expect(debtRow[1]).toMatchObject({ value:0, textColor:'#047857' })

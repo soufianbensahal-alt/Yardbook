@@ -126,7 +126,17 @@ function parseSession(data: { access_token:string; refresh_token?:string; expire
   return { ...session, userId:getRemoteOwnerId(session) || undefined }
 }
 
+let refreshInFlight: {owner:string|null; promise:Promise<RemoteSession|null>} | undefined
 export async function refreshRemoteSession(session: RemoteSession): Promise<RemoteSession | null> {
+  const owner=getRemoteOwnerId(session)
+  if(refreshInFlight?.owner===owner)return refreshInFlight.promise
+  const promise=performRefresh(session)
+  refreshInFlight={owner,promise}
+  try {return await promise}finally{if(refreshInFlight?.promise===promise)refreshInFlight=undefined}
+}
+async function performRefresh(session:RemoteSession):Promise<RemoteSession|null> {
+  const latest=readRemoteSession()
+  if(latest && getRemoteOwnerId(latest)===getRemoteOwnerId(session))session=latest
   if (!session.refreshToken) return null
   const response = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
@@ -134,6 +144,7 @@ export async function refreshRemoteSession(session: RemoteSession): Promise<Remo
     body: JSON.stringify({ refresh_token: session.refreshToken }),
   })
   if (!response.ok) {
+    if(response.status>=500||response.status===429)throw new Error('No se puede renovar la sesión temporalmente. Inténtalo de nuevo.')
     saveRemoteSession(null)
     return null
   }
@@ -154,7 +165,8 @@ export async function signOutRemote(session: RemoteSession, scope: RemoteSignOut
 }
 
 async function authedFetch(url: string, session: RemoteSession, init: RequestInit = {}, extraHeaders: Record<string, string> = {}) {
-  const currentSession = session
+  const latest=readRemoteSession()
+  const currentSession = latest && getRemoteOwnerId(latest)===getRemoteOwnerId(session) ? latest : session
   const request = (nextSession: RemoteSession) => fetch(url, { ...init, headers: headers(nextSession, extraHeaders) })
   const response = await request(currentSession)
   if (response.status !== 401) return response
@@ -202,5 +214,29 @@ export async function callNotificationService(body:Record<string,unknown>) {
   if(!session || !remoteEnabled)throw new Error('Inicia sesión para configurar las notificaciones.')
   const response=await authedFetch(`${config.url}/functions/v1/notification-device`,session,{method:'POST',body:JSON.stringify(body)})
   if(!response.ok)throw new Error('El servicio de notificaciones no está disponible. Revisa su configuración o inténtalo de nuevo.')
-  return response.json() as Promise<{publicKey?:string;active?:boolean}>
+  return response.json() as Promise<{publicKey?:string;active?:boolean;devices?:{id:string;device_name:string;platform:string;active:boolean;last_used_at?:string}[];deliveries?:{delivery_key:string;title:string;scheduled_at:string;status:string;attempts:number;error_code?:string;notification_sent_at?:string}[]}>
+}
+
+export async function privateStorage(path:string,init:RequestInit={}) {
+  const session=readRemoteSession()
+  if(!session||!remoteEnabled)throw new Error('Inicia sesión y conecta con Supabase para guardar fotografías.')
+  const response=await authedFetch(`${config.url}/storage/v1/${path}`,session,init,init.body instanceof Blob?{'Content-Type':init.body.type}:{})
+  if(!response.ok)throw new Error('No se ha podido acceder a la fotografía privada. Comprueba la conexión y vuelve a intentarlo.')
+  return response
+}
+export function storageSignedUrl(path:string) {return `${config.url}/storage/v1${path}`}
+
+export async function saveRemoteChanges(state:FleetState,base:FleetState,session:RemoteSession):Promise<RemoteRow> {
+  const {mergeFleetState}=await import('./stateMerge')
+  for(let attempt=0;attempt<3;attempt++){
+    const remote=await fetchRemoteState(session)
+    if(!remote){return {state,updated_at:await saveRemoteState(state,session)}}
+    const merged=mergeFleetState(base,state,remote.state)
+    const updatedAt=new Date(Math.max(Date.now(),Date.parse(remote.updated_at)+1)).toISOString()
+    const response=await authedFetch(restUrl(`?${ownerQuery(session)}&updated_at=eq.${encodeURIComponent(remote.updated_at)}&select=state,updated_at,user_id`),session,{method:'PATCH',body:JSON.stringify({state:merged,updated_at:updatedAt})},{Prefer:'return=representation'})
+    if(!response.ok)throw new Error('No se han podido sincronizar los cambios. Se conservan en la caché local.')
+    const rows=await response.json() as RemoteRow[]
+    if(rows[0])return rows[0]
+  }
+  throw new Error('Hay cambios simultáneos en otro dispositivo. Intenta sincronizar de nuevo.')
 }

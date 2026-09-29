@@ -72,5 +72,5 @@ export function dateInZone(now=new Date(),timezone=defaultTimezone) {return Temp
 export function upcomingReminders(state:FleetState,now=new Date()) {
   const today=dateInZone(now,state.adminSettings.notifications?.timezone)
   const end=Temporal.PlainDate.from(today).add({days:90}).toString()
-  return state.events.flatMap(event=>occurrences(event,today,end)).sort((a,b)=>a.at.localeCompare(b.at))
+  return state.events.flatMap(event=>occurrences(event,event.recurrence?today:event.date,end)).sort((a,b)=>a.at.localeCompare(b.at))
 }

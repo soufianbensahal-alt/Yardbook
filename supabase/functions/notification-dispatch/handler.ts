@@ -3,7 +3,7 @@ import { Temporal } from '@js-temporal/polyfill'
 import { db, env, configured, rpc, allowedEndpoint, loadNotificationConfig } from '../_shared/server.ts'
 import { occurrences, dateInZone, validateReminder } from '../_shared/reminders.ts'
 import type { CalendarEvent, FleetState } from '../_shared/types.ts'
-interface Subscription {id:string;user_id:string;session_id:string;endpoint:string;keys:{p256dh:string;auth:string}}
+interface Subscription {created_at?:string;id:string;user_id:string;session_id:string;endpoint:string;keys:{p256dh:string;auth:string}}
 async function digest(value:string) {return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(b=>b.toString(16).padStart(2,'0')).join('')}
 export const handleDispatch=async (request:Request)=>{
   if(request.method!=='POST')return new Response('Method not allowed',{status:405})
@@ -22,7 +22,7 @@ export const handleDispatch=async (request:Request)=>{
   try {
     // Pagination prevents silently ignoring devices after the PostgREST row limit.
     for(let page=0;page<100;page++) {
-      const devices:Subscription[]=await db(`notification_subscriptions?select=*&order=id&limit=100&offset=${page*100}`)
+      const devices:Subscription[]=await db(`notification_subscriptions?active=eq.true&select=*&order=id&limit=100&offset=${page*100}`)
       for(const device of devices) {
         if(!allowedEndpoint(device.endpoint))continue
         if(!await rpc('notification_session_active',{owner:device.user_id,session:device.session_id}))continue
@@ -38,8 +38,9 @@ export const handleDispatch=async (request:Request)=>{
           for(const occurrence of occurrences(event,from,to)) {
             for(const notice of occurrence.notifications) {
               const timestamp=Date.parse(notice.at)
-              if(timestamp>now.getTime()||timestamp<cutoff.getTime()||timestamp<Date.parse(event.updatedAt))continue
+              if(timestamp>now.getTime()+30*86400000||timestamp<cutoff.getTime()||timestamp<Date.parse(event.updatedAt)||timestamp<Date.parse(device.created_at||'1970-01-01'))continue
               const deliveryKey=await digest(`${device.id}:${event.id}:${event.revision}:${occurrence.date}:${notice.index}`)
+              if(timestamp>now.getTime()){await rpc('notification_schedule',{p_device:device.id,p_event:event.id,p_revision:event.revision,p_key:deliveryKey,p_scheduled:notice.at});continue}
               // Atomic unique claim rechecks ownership, session, preferences and current event revision.
               const accepted=await rpc('notification_claim',{p_device:device.id,p_event:event.id,p_revision:event.revision,p_key:deliveryKey,p_scheduled:notice.at})
               if(!accepted)continue
@@ -53,15 +54,15 @@ export const handleDispatch=async (request:Request)=>{
                 await db(`notification_deliveries?delivery_key=eq.${deliveryKey}`,{method:'PATCH',body:JSON.stringify({status:'cancelled'})});continue
               }
               try {
-                await webpush.sendNotification({endpoint:device.endpoint,keys:device.keys},JSON.stringify({ownerId:device.user_id,tag:deliveryKey,body:`${event.title} · ${occurrence.date.split('-').reverse().join('/')} a las ${occurrence.time} (${event.timezone})`,url:`/app/calendario?reminder=${encodeURIComponent(event.id)}&date=${occurrence.date}`}),{vapidDetails:{subject:env('VAPID_SUBJECT'),publicKey:env('VAPID_PUBLIC_KEY'),privateKey:env('VAPID_PRIVATE_KEY')},TTL:3600,timeout:10000})
+                await webpush.sendNotification({endpoint:device.endpoint,keys:device.keys},JSON.stringify({ownerId:device.user_id,tag:deliveryKey,body:`${event.title} · ${occurrence.date.split('-').reverse().join('/')} a las ${occurrence.time} (${event.timezone})`,url:`/app/calendario?reminder=${encodeURIComponent(event.id)}&date=${occurrence.date}`}),{vapidDetails:{subject:env('VAPID_SUBJECT'),publicKey:env('VAPID_PUBLIC_KEY'),privateKey:env('VAPID_PRIVATE_KEY')},TTL:86400,timeout:10000})
                 sent++
                 await db(`notification_deliveries?delivery_key=eq.${deliveryKey}`,{method:'PATCH',body:JSON.stringify({status:'sent',notification_sent:true,notification_sent_at:new Date().toISOString()})})
               }catch(error) {
                 failed++
                 const code=(error as {statusCode?:number;response?:Response}).statusCode || (error as {response?:Response}).response?.status
-                // Never retry an ambiguous send: delivery may already have occurred. Surface failures for review.
-                await db(`notification_deliveries?delivery_key=eq.${deliveryKey}`,{method:'PATCH',body:JSON.stringify({status:'failed',error_code:String(code||'network_or_unknown')})})
-                if(code===404||code===410)await db(`notification_subscriptions?id=eq.${device.id}`,{method:'DELETE'})
+                // Three atomic attempts maximum; stable tag and SW receipt journal suppress duplicates.
+                await db(`notification_deliveries?delivery_key=eq.${deliveryKey}`,{method:'PATCH',body:JSON.stringify({status:'failed',error_code:String(code||'network_or_unknown'),next_attempt_at:!code||code===429||code>=500?new Date(Date.now()+120000).toISOString():null})})
+                if(code===404||code===410)await db(`notification_subscriptions?id=eq.${device.id}`,{method:'PATCH',body:JSON.stringify({active:false,updated_at:new Date().toISOString()})})
               }
             }
           }

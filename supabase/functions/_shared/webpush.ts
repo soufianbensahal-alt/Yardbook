@@ -8,7 +8,8 @@ const webpush={
   },
   async sendNotification(subscription:{endpoint:string;keys:{p256dh:string;auth:string}},payload:string,options:{vapidDetails:{subject:string;publicKey:string;privateKey:string};TTL:number;timeout:number}) {
     const app=await ApplicationServer.new({contactInformation:options.vapidDetails.subject,vapidKeys:await importVapidKeys(JSON.parse(options.vapidDetails.privateKey))})
-    await app.subscribe(subscription).pushTextMessage(payload,{ttl:options.TTL})
+    let timer:ReturnType<typeof setTimeout>|undefined
+    try {await Promise.race([app.subscribe(subscription).pushTextMessage(payload,{ttl:options.TTL}),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('push_timeout')),options.timeout)})])}finally{clearTimeout(timer)}
     return {statusCode:201,body:'',headers:{}}
   }
 }

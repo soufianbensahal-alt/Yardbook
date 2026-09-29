@@ -1,6 +1,140 @@
 {
   "type": "object",
   "properties": {
+    "debts": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "customerId": {
+                "type": "string"
+              },
+              "customerName": {
+                "type": "string"
+              },
+              "originalAmount": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "dueDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "rentalId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "vehicleId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "cancelled": {
+                "anyOf": [
+                  {
+                    "const": false
+                  },
+                  {
+                    "const": true
+                  }
+                ]
+              },
+              "notes": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "customerId",
+              "customerName",
+              "originalAmount",
+              "date",
+              "reason",
+              "notes",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        }
+      ]
+    },
+    "debtPayments": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "debtId": {
+                "type": "string"
+              },
+              "customerId": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string"
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "notes": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "debtId",
+              "customerId",
+              "amount",
+              "date",
+              "method",
+              "notes",
+              "createdAt"
+            ]
+          }
+        }
+      ]
+    },
     "version": {
       "const": 4
     },
@@ -762,6 +896,107 @@
       "items": {
         "type": "object",
         "properties": {
+          "laborCost": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "otherCost": {
+            "anyOf": [
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "materials": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "quantity": {
+                      "type": "number"
+                    },
+                    "unitPrice": {
+                      "type": "number"
+                    },
+                    "supplier": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "reference": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "purchaseDate": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "photos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "thumbnailPath": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "number"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "path",
+                          "thumbnailPath",
+                          "size",
+                          "mimeType"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "category",
+                    "quantity",
+                    "unitPrice",
+                    "purchaseDate",
+                    "notes",
+                    "photos"
+                  ]
+                }
+              }
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -1180,6 +1415,20 @@
             ]
           },
           "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "debtId": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "documentId": {
             "anyOf": [
               {
                 "type": "string"

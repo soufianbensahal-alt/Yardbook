@@ -209,3 +209,20 @@ describe('remoteStore', () => {
     expect(session).toMatchObject({ accessToken:'token-2', refreshToken:'refresh-2', userId:'user-a', email:'hola@monkey.test' })
   })
 })
+
+it('combina cambios remotos y usa una actualización condicional al guardar',async()=>{
+ vi.resetModules();vi.stubEnv('VITE_SUPABASE_URL','https://supabase.test');vi.stubEnv('VITE_SUPABASE_ANON_KEY','anon-key')
+ localStorage.clear();sessionStorage.clear()
+ const other={id:'remote',title:'ITV',date:'2026-10-01',type:'itv' as const}
+ const local={id:'local',title:'Pago',date:'2026-10-01',type:'pago' as const}
+ const remote={state:{...emptyState,events:[other]},updated_at:'2026-09-29T15:00:00Z'}
+ const fetchMock=vi.fn().mockResolvedValueOnce({ok:true,json:async()=>[remote]}).mockImplementationOnce(async(_url,init)=>({ok:true,json:async()=>[JSON.parse(init.body)]}))
+ vi.stubGlobal('fetch',fetchMock)
+ try {
+  const {saveRemoteChanges}=await import('./remoteStore')
+  const result=await saveRemoteChanges({...emptyState,events:[local]},emptyState,{accessToken:'test',userId:'owner'})
+  expect(result.state.events).toEqual([other,local])
+  expect(fetchMock.mock.calls[1][0]).toContain('updated_at=eq.2026-09-29T15%3A00%3A00Z')
+  expect(fetchMock.mock.calls[1][1].method).toBe('PATCH')
+ }finally{vi.unstubAllGlobals();vi.unstubAllEnvs()}
+})

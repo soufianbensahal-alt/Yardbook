@@ -1,3 +1,5 @@
+import type { CalendarEvent } from '../types'
+import { uid } from '../lib/format'
 import { ReminderEditor } from '../components/ReminderEditor'
 import { UpcomingReminders } from '../components/UpcomingReminders'
 import { occurrences, offsetLabel, reminderDetails, reminderCategories } from '../lib/reminders'
@@ -269,6 +271,7 @@ function AgendaPanel({ selected, events, showEmptyAction, onAdd }: { selected: s
 }
 
 function AgendaCard({ event }: { event: AgendaEvent }) {
+  const [draft,setDraft]=useState<CalendarEvent|null>(null)
   const style = eventStyle[event.type]
   const Icon = style.icon
   return <article className={`calendar-agenda-card ${style.card}`}>
@@ -280,6 +283,8 @@ function AgendaCard({ event }: { event: AgendaEvent }) {
       </div>
       <h3 className="mt-2 font-bold leading-snug text-ink">{event.title}</h3>
       <p className="mt-1 text-sm leading-5 text-stone-600">{event.detail}</p>
+      {!event.reminderId&&<button className="btn-secondary mt-3" onClick={()=>setDraft({id:uid('event'),title:event.title,date:event.date,time:'09:00',description:event.detail,type:event.type.startsWith('pago')||event.type==='atrasado'?'pago':event.id.startsWith('rental-end-')?'devolución':event.type==='alquiler'?'entrega':event.type as CalendarEvent['type'],...(event.id.startsWith('document-')?{documentId:event.id.slice(9)}:{}),...(event.id.startsWith('maintenance-')?{maintenanceId:event.id.slice(12)}:{}),...(event.id.startsWith('payment-')?{paymentId:event.id.slice(8)}:{})})}>Configurar aviso móvil</button>}
+      {draft&&<ReminderEditor event={draft} date={draft.date} onClose={()=>setDraft(null)}/>}
       {event.reminderId&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>{event.status}{event.priority==='alta'?' · Prioridad alta':''}</span><Link className="btn-secondary min-h-10" to={`/app/calendario?reminder=${encodeURIComponent(event.reminderId)}&date=${event.date}`}>Editar alerta</Link></div>}
     </div>
   </article>

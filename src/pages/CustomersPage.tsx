@@ -1,3 +1,4 @@
+import { Debts } from '../components/Debts'
 import { useDeferredValue, useMemo, useState, type FormEvent } from 'react'
 import { Building2, Download, Eye, FileText, Mail, Pencil, Phone, Plus, Search, Upload, User } from 'lucide-react'
 import { Badge, ConfirmButton, EmptyState, Modal, PageHeader } from '../components/ui'
@@ -129,7 +130,7 @@ export default function CustomersPage() {
             {futureReservation && <Badge tone="info">Reserva {date(futureReservation.startDate)}</Badge>}
           </div>}
           <MileageHistory rentals={rentals} state={state}/>
-          <CustomerDocuments documents={documents} onAdd={() => openDocumentModal(customer)} onDelete={id => remove('clientDocuments', id)}/>
+          <Debts customerId={customer.id}/><CustomerDocuments documents={documents} onAdd={() => openDocumentModal(customer)} onDelete={id => remove('clientDocuments', id)}/>
         </article>
       })}
       {!rows.length && <div className="card md:col-span-2 xl:col-span-3">

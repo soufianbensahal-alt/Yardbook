@@ -1,8 +1,8 @@
 import schema from './backupSchema.json'
 import type { FleetState } from '../types'
 
-export const collections = ['vehicles','customers','rentals','payments','clientDocuments','tasks','maintenance','documents','taxes','fines','events'] as const
-export const collectionLabels = ['Vehículos','Clientes','Alquileres y reservas','Pagos y recordatorios','Referencias de documentos de clientes','Tareas','Mantenimiento y reparaciones','ITV / Documentación','Impuestos','Multas','Calendario']
+export const collections = ['vehicles','customers','rentals','payments','clientDocuments','tasks','maintenance','documents','taxes','fines','events','debts','debtPayments'] as const
+export const collectionLabels = ['Vehículos','Clientes','Alquileres y reservas','Pagos y recordatorios','Referencias de documentos de clientes','Tareas','Mantenimiento y reparaciones','ITV / Documentación','Impuestos','Multas','Calendario','Deudas','Pagos de deuda']
 export type RestoreMode = 'merge' | 'replace'
 export interface Backup { app:'Monkey Rentals'; backup_version:'1.0'; generated_at:string; user_id:string; data:FleetState }
 export const frequencies = { manual:'Solo manual', daily:'Cada día', weekly:'Cada semana', biweekly:'Cada 15 días', monthly:'Cada mes' }
@@ -30,7 +30,7 @@ export function parseBackup(text:string, owner:string|null):Backup {
   if (value.user_id !== owner) throw new Error('Esta copia pertenece a otra cuenta.')
   if (Object.keys(value).some(k=>!['app','backup_version','generated_at','user_id','data'].includes(k)) || typeof value.generated_at !== 'string' || !Number.isFinite(Date.parse(value.generated_at)) || !matches(value.data,schema as Schema)) throw new Error('La copia contiene campos inesperados o datos incorrectos.')
   for (const key of collections) {
-    const ids=value.data[key].map(item=>item.id)
+    const ids=(value.data[key] || []).map(item=>item.id)
     if (ids.some(id=>!id.trim() || ['__proto__','prototype','constructor'].includes(id)) || new Set(ids).size!==ids.length) throw new Error('La copia contiene identificadores vacíos o duplicados.')
   }
   if (value.data.clientDocuments.some(doc=>doc.dataUrl !== '')) throw new Error('Esta versión solo admite referencias de documentos, sin archivos adjuntos.')
@@ -45,10 +45,16 @@ export function createBackup(state:FleetState, owner:string|null, now=new Date()
 export function restoreBackup(current:FleetState, backup:Backup, mode:RestoreMode):FleetState {
   const next=structuredClone(backup.data)
   for (const key of collections) {
-    const existing=new Map(current[key].map(item=>[item.id,item]))
-    const incoming=next[key].map(item=>key==='clientDocuments' && existing.has(item.id) ? {...item,dataUrl:(existing.get(item.id) as FleetState['clientDocuments'][number]).dataUrl} : item)
-    const merged=mode==='merge' ? [...current[key],...incoming.filter(item=>!existing.has(item.id))] : incoming
+    const existing=new Map((current[key] || []).map(item=>[item.id,item]))
+    const incoming=(next[key] || []).map(item=>key==='clientDocuments' && existing.has(item.id) ? {...item,dataUrl:(existing.get(item.id) as FleetState['clientDocuments'][number]).dataUrl} : item)
+    const merged=mode==='merge' ? [...(current[key] || []),...incoming.filter(item=>!existing.has(item.id))] : incoming
     Object.assign(next,{[key]:merged})
+  }
+  // Restoring older backups must never erase an already recorded debt payment.
+  for(const key of ['debts','debtPayments'] as const){
+    const existing=new Map((current[key]||[]).map(item=>[item.id,item]))
+    const incoming=(next[key]||[]).filter(item=>!existing.has(item.id))
+    Object.assign(next,{[key]:[...existing.values(),...incoming]})
   }
   if (mode==='merge') next.adminSettings=structuredClone(current.adminSettings)
   return next

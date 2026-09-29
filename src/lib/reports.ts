@@ -1,7 +1,8 @@
+import { maintenanceCosts } from './maintenance'
 import type { FleetState } from '../types'
 import { isFlexiblePayment, paymentKindLabel } from './paymentReminders'
 
-export type ExpenseCategory = 'Reparaciones' | 'Mantenimiento' | 'ITV' | 'Impuestos' | 'Documentación' | 'Otros'
+export type ExpenseCategory = 'Mano de obra' | 'Materiales' | 'Repuestos' | 'Reparaciones' | 'Mantenimiento' | 'ITV' | 'Impuestos' | 'Documentación' | 'Otros'
 export type IncomeCategory = 'Alquiler' | 'Pago flexible' | 'Fianza' | 'Penalización' | 'Km extra' | 'Multa' | 'Otro' | 'Alquiler previsto'
 export type MovementStatus = 'pagado' | 'pendiente' | 'atrasado' | 'registrado'
 
@@ -48,10 +49,16 @@ export function economicMovements(state: FleetState, today = new Date().toISOStr
       customerId:item.customerId, amount:Number(item.agreedPrice), status:dueDate < today ? 'atrasado' : 'pendiente',
     }
   })
-  const maintenance: EconomicMovement[] = state.maintenance.filter(item => Number(item.cost) > 0).map(item => ({
-    id:`maintenance-${item.id}`, date:item.date, kind:'gasto', category:isRepair(item.type)?'Reparaciones':'Mantenimiento',
-    vehicleId:item.vehicleId, amount:Number(item.cost), status:'registrado',
-  }))
+  const debtPayments: EconomicMovement[] = (state.debtPayments||[]).map(p=>({id:`debt-payment-${p.id}`,date:p.date,kind:'ingreso',category:'Pago de deuda',customerId:p.customerId,vehicleId:state.debts?.find(d=>d.id===p.debtId)?.vehicleId,amount:p.amount,status:'pagado'}))
+  const maintenance: EconomicMovement[] = state.maintenance.flatMap(item => {
+    const costs=maintenanceCosts(item)
+    if(costs.legacy)return costs.total>0?[{id:`maintenance-${item.id}`,date:item.date,kind:'gasto' as const,category:isRepair(item.type)?'Reparaciones':'Mantenimiento',vehicleId:item.vehicleId,amount:costs.total,status:'registrado' as const}]:[]
+    return [
+      {id:`maintenance-${item.id}`,category:'Mano de obra',amount:costs.labor},
+      ...(item.materials||[]).map(m=>({id:`material-${m.id}`,category:['Consumibles','Aceite y filtros','Otros'].includes(m.category)?'Materiales':'Repuestos',amount:Math.round(m.quantity*m.unitPrice*100)/100})),
+      {id:`maintenance-other-${item.id}`,category:isRepair(item.type)?'Reparaciones':'Mantenimiento',amount:costs.other},
+    ].filter(m=>m.amount>0).map(m=>({...m,date:item.date,kind:'gasto' as const,vehicleId:item.vehicleId,status:'registrado' as const}))
+  })
   const taxes: EconomicMovement[] = state.taxes.filter(item => Number(item.amount) > 0).map(item => ({
     id:`tax-${item.id}`, date:item.paidDate || item.dueDate, kind:'gasto', category:'Impuestos', vehicleId:item.vehicleId,
     amount:Number(item.amount), status:item.status === 'pagado' ? 'pagado' : item.dueDate < today ? 'atrasado' : 'pendiente',
@@ -65,12 +72,12 @@ export function economicMovements(state: FleetState, today = new Date().toISOStr
     id:`fine-${item.id}`, date:item.infractionDate, kind:'gasto', category:'Otros', vehicleId:item.vehicleId,
     customerId:item.customerId, amount:Number(item.amount), status:item.status === 'pagada' ? 'pagado' : 'pendiente',
   }))
-  return [...payments, ...rentalIncome, ...maintenance, ...taxes, ...documents, ...fines]
+  return [...debtPayments, ...payments, ...rentalIncome, ...maintenance, ...taxes, ...documents, ...fines]
 }
 
 export function buildReport(state: FleetState, today = new Date().toISOString().slice(0, 10)) {
   const movements = economicMovements(state, today)
-  const hasEconomicData = state.payments.some(item=>Number(item.amount)>0)
+  const hasEconomicData = Boolean(state.debts?.length || state.debtPayments?.length) || state.payments.some(item=>Number(item.amount)>0)
     || state.rentals.some(item=>Number(item.agreedPrice)>0)
     || state.maintenance.some(item=>Number(item.cost)>0)
     || state.documents.some(item=>Number(item.cost||0)>0)
@@ -97,7 +104,7 @@ export function buildReport(state: FleetState, today = new Date().toISOString().
     return acc
   },{})
   const monthly=Object.values(monthlyMap).sort((a,b)=>a.month.localeCompare(b.month)).slice(-12)
-  const categories = (['Reparaciones','Mantenimiento','ITV','Impuestos','Documentación','Otros'] as ExpenseCategory[]).map(category => ({
+  const categories = (['Mano de obra','Materiales','Repuestos','Reparaciones','Mantenimiento','ITV','Impuestos','Documentación','Otros'] as ExpenseCategory[]).map(category => ({
     category,
     total:realizedExpenses.filter(item => item.category === category).reduce((sum,item)=>sum+item.amount,0),
   })).filter(item => item.total > 0)

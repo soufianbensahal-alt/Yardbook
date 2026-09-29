@@ -23,7 +23,7 @@ export function ReminderEditor({event,date,onClose}:{event?:CalendarEvent;date:s
     if(syncStatus==='loading'){setError('Espera a que termine la sincronización.');return}
     upsert('events',next);onClose()
   }
-  const relationship=(label:string,key:'customerId'|'vehicleId'|'rentalId'|'paymentId'|'maintenanceId',options:{id:string;label:string}[])=><label><span className="label">{label} (opcional)</span><select className="field" value={draft[key]||''} onChange={e=>{
+  const relationship=(label:string,key:'customerId'|'vehicleId'|'rentalId'|'paymentId'|'maintenanceId'|'documentId'|'debtId',options:{id:string;label:string}[])=><label><span className="label">{label} (opcional)</span><select className="field" value={draft[key]||''} onChange={e=>{
     const id=e.target.value||undefined
     const payment=key==='paymentId'?state.payments.find(p=>p.id===id):undefined
     const rental=key==='rentalId'?state.rentals.find(r=>r.id===id):payment?state.rentals.find(r=>r.id===payment.rentalId):undefined
@@ -66,6 +66,8 @@ export function ReminderEditor({event,date,onClose}:{event?:CalendarEvent;date:s
     {relationship('Alquiler / reserva','rentalId',state.rentals.map(r=>({id:r.id,label:`${state.customers.find(c=>c.id===r.customerId)?.name||'Cliente'} · ${r.startDate} → ${r.endDate||'Sin fecha final'}`})))}
     {relationship('Pago','paymentId',state.payments.map(p=>({id:p.id,label:`${p.amount} € · ${p.dueDate} · ${state.customers.find(c=>c.id===state.rentals.find(r=>r.id===p.rentalId)?.customerId)?.name||'Cliente'}`})))}
     {relationship('Mantenimiento','maintenanceId',state.maintenance.map(m=>({id:m.id,label:`${m.type} · ${m.date}`})))}
+    {relationship('ITV / Documento','documentId',state.documents.map(d=>({id:d.id,label:`${d.type} · ${d.expiryDate}`})))}
+    {relationship('Deuda','debtId',(state.debts||[]).map(d=>({id:d.id,label:`${d.customerName} · ${d.reason}`})))}
     <label className="sm:col-span-2"><span className="label">Notas</span><textarea className="field" maxLength={4000} value={draft.notes||''} onChange={e=>set({notes:e.target.value})}/></label>
     <p className="text-xs text-stone-500 sm:col-span-2">La alerta aparecerá en la app. Para recibir avisos en el dispositivo, activa las notificaciones en Configuración. Si editas una alerta repetida, se modifica toda la serie.</p>
     <div className="flex flex-wrap justify-end gap-3 sm:col-span-2">{event&&<ConfirmButton title="Eliminar alerta" message="¿Eliminar esta alerta y cancelar todos sus próximos avisos?" onConfirm={()=>{remove('events',event.id);onClose()}}/>}<button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={syncStatus==='loading'}>Guardar alerta</button></div>

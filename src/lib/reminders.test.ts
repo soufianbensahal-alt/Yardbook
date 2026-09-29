@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateInZone, occurrences, reminderInstant, validateReminder, zonedEvent } from './reminders'
+import { dateInZone, occurrences, upcomingReminders, reminderInstant, validateReminder, zonedEvent } from './reminders'
 import { createBackup, parseBackup } from './backups'
 import { emptyState } from '../data/emptyState'
 import type { CalendarEvent } from '../types'
@@ -46,4 +46,11 @@ describe('programación de recordatorios',()=>{
     expect(parseBackup(JSON.stringify(backup),'user-a').data.events).toEqual([event])
     expect(createBackup(emptyState,'user-a').data.events).toEqual([])
   })
+})
+
+// Past active events must remain visible until explicitly resolved.
+it('mantiene una ITV pasada pendiente aunque el aviso ya se haya enviado',()=>{
+ const state={...emptyState,events:[{id:'past-itv',title:'ITV pendiente',date:'2026-09-01',time:'09:00',timezone:'Europe/Madrid',type:'itv' as const,status:'active' as const,reminders:[{value:0,unit:'minutes' as const}]}]}
+ expect(upcomingReminders(state,new Date('2026-09-28T12:00:00Z')).map(o=>o.event.id)).toContain('past-itv')
+ expect(upcomingReminders({...state,events:[{...state.events[0],status:'completed'}]},new Date('2026-09-28T12:00:00Z'))).toHaveLength(0)
 })

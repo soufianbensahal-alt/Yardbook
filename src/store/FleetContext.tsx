@@ -1,21 +1,23 @@
-import { clearDeviceOnLogout } from '../lib/pushNotifications'
+import { mergeFleetState } from '../lib/stateMerge'
+import { validateDebtPayment } from '../lib/debts'
+import { clearDeviceOnLogout, reconcileDevice } from '../lib/pushNotifications'
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Monitor, Moon, ShieldCheck, Sun } from 'lucide-react'
 import { parseBackup, restoreBackup, type RestoreMode } from '../lib/backups'
 import { emptyState } from '../data/emptyState'
-import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
+import { fetchRemoteMeta, fetchRemoteState, getRememberRemoteSession, getRemoteOwnerId, readRemoteSession, refreshRemoteSession, remoteEnabled, saveRemoteSession, saveRemoteState, saveRemoteChanges, setRememberRemoteSession, signInRemote, signOutRemote, type RemoteSession, type RemoteStatus } from '../lib/remoteStore'
 import { saveRentalMileage } from '../lib/mileage'
 import { getNextPaymentDate } from '../lib/paymentReminders'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
-import type { AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
+import type { ClientDebt, DebtPayment, AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
 const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2']
 const REMOTE_SAVE_DEBOUNCE_MS = 1200
 const REMOTE_REFRESH_INTERVAL_MS = 60000
 const REMOTE_REFRESH_MIN_GAP_MS = 10000
-type Entity = Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
-type Collection = 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
+type Entity = ClientDebt | DebtPayment | Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
+type Collection = 'debts' | 'debtPayments' | 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
   | { type:'dismissMileageAlert'; id:string }
   | { type:'saveRentalMileage'; rental:Rental; createCharge:boolean; today:string }
@@ -75,9 +77,9 @@ function reducer(state: FleetState, action: Action): FleetState {
       return { ...state, customers:state.customers.filter(item=>item.id!==action.id), rentals:state.rentals.filter(item=>item.customerId!==action.id), payments:state.payments.filter(item=>!rentalIds.includes(item.rentalId)), clientDocuments:state.clientDocuments.filter(item=>item.customerId!==action.id), fines:state.fines.map(item=>item.customerId===action.id?{...item,customerId:undefined}:item) }
     }
     if (action.collection === 'rentals') return { ...state, rentals:state.rentals.filter(item=>item.id!==action.id), payments:state.payments.filter(item=>item.rentalId!==action.id) }
-    return { ...state, [action.collection]: state[action.collection].filter(item => item.id !== action.id) }
+    return { ...state, [action.collection]: (state[action.collection] || []).filter(item => item.id !== action.id) }
   }
-  const list = state[action.collection] as Entity[]
+  const list = (state[action.collection] || []) as Entity[]
   const exists = list.some(item => item.id === action.item.id)
   return { ...state, [action.collection]: exists ? list.map(item => item.id === action.item.id ? action.item : item) : [action.item, ...list] }
 }
@@ -215,6 +217,27 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { stateRef.current = state }, [state])
 
+  const saving=useRef<Promise<void>|null>(null)
+  const persistChanges=useCallback(async (currentSession:RemoteSession)=>{
+    if(saving.current)await saving.current
+    const snapshot=stateRef.current
+    const base=JSON.parse(lastSyncedState.current) as FleetState
+    const work=(async()=>{
+      const remote=await saveRemoteChanges(snapshot,base,currentSession)
+      if(getRemoteOwnerId(readRemoteSession())!==getRemoteOwnerId(currentSession))return
+      const merged=mergeFleetState(snapshot,stateRef.current,remote.state)
+      remoteUpdatedAt.current=remote.updated_at
+      lastSyncedState.current=JSON.stringify(remote.state)
+      localStorage.setItem(`${storageKeyForSession(currentSession)}:synced`,lastSyncedState.current)
+      if(JSON.stringify(merged)!==JSON.stringify(stateRef.current)){
+        stateRef.current=merged;skipNextSave.current=true;dispatch({type:'hydrate',state:merged})
+      }
+    })()
+    saving.current=work
+    try {await work}finally{if(saving.current===work)saving.current=null}
+  },[])
+
+
   useEffect(() => {
     if (!remoteEnabled) {
       applyTheme(getSavedTheme(), { persist: false })
@@ -222,7 +245,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     }
     if (session) applyTheme(getSavedTheme(), { persist: false })
     else applyLoginTheme(getSavedLoginThemeMode())
-  }, [session])
+  }, [session,persistChanges])
 
   const hydrateFromRemote = useCallback(async (currentSession = session) => {
     if (!remoteEnabled || !currentSession) return
@@ -232,11 +255,20 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       const remote = await fetchRemoteState(currentSession)
       if (remote) {
         const remoteState = normalizeState(remote.state)
+        const cached=readCachedState(cacheKey,false)
+        const baseline=parseCachedState(localStorage.getItem(`${cacheKey}:synced`))
+        // Keep the original comparison base if merging detects a conflict.
+        // Treating the remote copy as that base would let a later retry overwrite it.
+        if(baseline)lastSyncedState.current=JSON.stringify(baseline)
+        const merged=cached&&baseline?mergeFleetState(baseline,cached,remoteState):remoteState
+        if(getRemoteOwnerId(readRemoteSession())!==getRemoteOwnerId(currentSession))return
         remoteUpdatedAt.current = remote.updated_at
         lastSyncedState.current = JSON.stringify(remoteState)
+        localStorage.setItem(`${cacheKey}:synced`,lastSyncedState.current)
         skipNextSave.current = true
-        dispatch({ type:'hydrate', state:remoteState })
-        localStorage.setItem(cacheKey, lastSyncedState.current)
+        stateRef.current=merged
+        dispatch({ type:'hydrate', state:merged })
+        persistCachedState(cacheKey,merged)
       } else {
         const cachedState = readCachedState(cacheKey, false) ?? structuredClone(emptyState)
         initialCache.current = cachedState
@@ -288,9 +320,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     const timeout = window.setTimeout(async () => {
       setSyncStatus('saving')
       try {
-        const savingState=stateRef.current
-        remoteUpdatedAt.current = await saveRemoteState(savingState, session)
-        lastSyncedState.current = JSON.stringify(savingState)
+        await persistChanges(session)
         setSyncStatus('online')
         setSyncError('')
       } catch (error) {
@@ -299,7 +329,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       }
     }, REMOTE_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
-  }, [state, session])
+  }, [state, session,persistChanges])
 
   useEffect(() => {
     if (!remoteEnabled || !session) return
@@ -310,9 +340,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       lastRefreshAt.current = now
       try {
         if (JSON.stringify(snapshot)!==lastSyncedState.current) {
-          const updatedAt=await saveRemoteState(snapshot,session)
-          remoteUpdatedAt.current=updatedAt
-          lastSyncedState.current=JSON.stringify(snapshot)
+          await persistChanges(session)
           setSyncStatus('online')
           setSyncError('')
           return
@@ -327,6 +355,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           skipNextSave.current = true
           dispatch({ type:'hydrate', state:remoteState })
           localStorage.setItem(storageKeyForSession(session), lastSyncedState.current)
+          localStorage.setItem(`${storageKeyForSession(session)}:synced`,lastSyncedState.current)
         }
         setSyncStatus('online')
         setSyncError('')
@@ -345,7 +374,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', onFocus)
     const interval = window.setInterval(refresh, REMOTE_REFRESH_INTERVAL_MS)
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); window.clearInterval(interval) }
-  }, [session])
+  }, [session,persistChanges])
+
+  useEffect(()=>{
+    const owner=getRemoteOwnerId(session)
+    if(!owner)return
+    const reconcile=()=>{if(!document.hidden)void reconcileDevice(owner).catch(()=>{})}
+    reconcile();window.addEventListener('focus',reconcile)
+    return()=>window.removeEventListener('focus',reconcile)
+  },[session])
 
   const signIn = useCallback(async (email:string,password:string,remember:boolean) => {
     setSyncStatus('loading')
@@ -414,7 +451,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       if (nextSession) setSession(nextSession)
       else clearRemoteLogin('La sesión ha caducado o se ha cerrado desde otro dispositivo.')
     }
-    void validate()
+    void validate().catch(()=>{if(!cancelled){setSyncStatus('offline');setSyncError('No se ha podido comprobar la sesión. Se conserva la caché hasta recuperar la conexión.')}})
     return () => { cancelled = true }
   }, [clearRemoteLogin])
 
@@ -428,17 +465,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const retrySync = useCallback(async () => {
     if (session && hydrated.current && JSON.stringify(stateRef.current)!==lastSyncedState.current) {
-      const pending=stateRef.current
-      setSyncStatus('saving')
+        setSyncStatus('saving')
       try {
-        remoteUpdatedAt.current=await saveRemoteState(pending,session)
-        lastSyncedState.current=JSON.stringify(pending)
+        await persistChanges(session)
         setSyncStatus('online');setSyncError('')
       } catch(error) {
         setSyncStatus('offline');setSyncError(error instanceof Error?error.message:'No se han podido sincronizar los cambios.')
       }
     } else await hydrateFromRemote(session)
-  }, [hydrateFromRemote, session])
+  }, [hydrateFromRemote, session,persistChanges])
 
   const value = useMemo(() => ({
     state, syncStatus, syncError, remoteEnabled, authEmail:session?.email, rememberSession,
@@ -457,7 +492,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       saveRentalMileage(state, rental, createCharge, today)
       dispatch({type:'saveRentalMileage',rental,createCharge,today})
     },
-    upsert:(collection:Collection,item:Entity)=>dispatch({type:'upsert',collection,item}),
+    upsert:(collection:Collection,item:Entity)=>{if(collection==='debtPayments')validateDebtPayment(stateRef.current,item as DebtPayment);const next=reducer(stateRef.current,{type:'upsert',collection,item});stateRef.current=next;dispatch({type:'hydrate',state:next})},
     remove:(collection:Collection,id:string)=>dispatch({type:'remove',collection,id}),
     dismissMileageAlert:(id:string)=>dispatch({type:'dismissMileageAlert',id}),
     toggleTask:(id:string)=>dispatch({type:'toggleTask',id}),

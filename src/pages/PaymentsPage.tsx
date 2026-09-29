@@ -1,3 +1,4 @@
+import { Debts, DebtStats, DebtPayments } from '../components/Debts'
 import { useDeferredValue, useMemo, useState, type FormEvent } from 'react'
 import { Check, CreditCard, Pencil, Plus, Search } from 'lucide-react'
 import { Badge, ConfirmButton, EmptyState, Modal, PageHeader, StatCard } from '../components/ui'
@@ -34,7 +35,7 @@ export default function PaymentsPage() {
     const haystack = `${item.customer?.name} ${vehicleLabel(item.vehicle)} ${item.vehicle?.plate} ${item.payment.dueDate} ${item.status} ${paymentKindLabel(item.payment)} ${paymentReminderLabel(item.payment)}`.toLowerCase()
     return matchesFilter && haystack.includes(deferred.toLowerCase())
   }), [decorated, filter, deferred])
-  const paid = decorated.filter(item => item.status === 'pagado').reduce((sum, item) => sum + item.payment.amount, 0)
+  const paid = (state.debtPayments||[]).reduce((s,p)=>s+p.amount,0) + decorated.filter(item => item.status === 'pagado').reduce((sum, item) => sum + item.payment.amount, 0)
   const pending = decorated.filter(item => item.status !== 'pagado' && item.status !== 'cancelado').reduce((sum, item) => sum + item.payment.amount, 0)
   const overdue = decorated.filter(item => item.status === 'atrasado').reduce((sum, item) => sum + item.payment.amount, 0)
   const flexible = decorated.filter(item => item.flexible && item.status !== 'pagado' && item.status !== 'cancelado').reduce((sum, item) => sum + item.payment.amount, 0)
@@ -106,6 +107,7 @@ export default function PaymentsPage() {
       <StatCard label="Flexible" value={euro.format(flexible)} detail="Requiere seguimiento manual" icon={CreditCard} tone="blue"/>
       <StatCard label="Dinero atrasado" value={euro.format(overdue)} detail={`${decorated.filter(item => item.status === 'atrasado').length} pagos requieren seguimiento`} icon={CreditCard} tone="red" valueTone={overdue === 0 ? 'green' : 'red'}/>
     </section>
+    <DebtStats/><Debts/><DebtPayments/>
     {state.payments.length > 0 && <>
       <div className="mt-5 flex flex-wrap gap-2">{['todos', 'pendiente', 'atrasado', 'flexible', 'pagado', 'cancelado'].map(value => <button key={value} className={`min-h-10 rounded-xl px-4 text-sm font-bold capitalize ${filter === value ? 'bg-brand-500 text-white' : 'border border-orange-100 bg-white text-stone-600'}`} onClick={() => setFilter(value)}>{value}</button>)}</div>
       <label className="group relative my-4 block max-w-2xl"><span className="sr-only">Buscar pagos</span><input className="field search-field" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar pago o estado"/>{!query && <Search className="search-icon pointer-events-none absolute top-1/2 -translate-y-1/2 text-brand-500 group-focus-within:hidden" size={18}/>}</label>

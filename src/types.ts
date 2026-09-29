@@ -116,7 +116,11 @@ export interface ClientDocument {
 }
 
 export interface Task { id: string; title: string; dueDate: string; priority: Priority; completed: boolean; category: string }
-export interface MaintenanceRecord { id: string; vehicleId: string; type: string; date: string; cost: number; status: 'programado' | 'en curso' | 'completado'; notes: string }
+export interface MaterialPhoto { id:string; path:string; thumbnailPath:string; size:number; mimeType:string }
+export interface MaintenanceMaterial { id:string; name:string; category:string; quantity:number; unitPrice:number; supplier?:string; reference?:string; purchaseDate:string; notes:string; photos:MaterialPhoto[] }
+export interface ClientDebt { id:string; customerId:string; customerName:string; originalAmount:number; date:string; dueDate?:string; reason:string; rentalId?:string; vehicleId?:string; cancelled?:boolean; notes:string; createdAt:string; updatedAt:string }
+export interface DebtPayment { id:string; debtId:string; customerId:string; amount:number; date:string; method:string; reference?:string; notes:string; createdAt:string }
+export interface MaintenanceRecord { laborCost?:number; otherCost?:number; materials?:MaintenanceMaterial[]; id: string; vehicleId: string; type: string; date: string; cost: number; status: 'programado' | 'en curso' | 'completado'; notes: string }
 export interface Document { id: string; vehicleId: string; type: string; expiryDate: string; cost?: number; paymentStatus?: 'pendiente' | 'pagado'; paidDate?: string; notes: string }
 export interface VehicleTax { id: string; vehicleId: string; concept: string; dueDate: string; amount: number; status: 'pendiente' | 'pagado'; paidDate?: string; notes: string }
 export interface Fine { id: string; vehicleId: string; customerId?: string; rentalId?: string; infractionDate: string; dueDate?: string; amount: number; status: 'pendiente' | 'pagada' | 'reclamada' | 'cargada al cliente' | 'archivada'; concept: string; notes: string }
@@ -128,12 +132,14 @@ export interface CalendarEvent {
   description?:string; time?:string; timezone?:string; reminders?:ReminderOffset[]
   recurrence?:ReminderRecurrence; priority?:Priority; notes?:string
   status?:'active'|'completed'|'cancelled'; revision?:string; createdAt?:string; updatedAt?:string
-  customerId?:string; vehicleId?:string; rentalId?:string; paymentId?:string; maintenanceId?:string
+  debtId?:string; documentId?:string; customerId?:string; vehicleId?:string; rentalId?:string; paymentId?:string; maintenanceId?:string
 }
 export interface NotificationSettings { enabled:boolean; categories:ReminderCategory[]; timezone:string }
 export interface AdminSettings { notifications?:NotificationSettings; name: string; company: string; email: string; phone: string }
 
 export interface FleetState {
+  debts?: ClientDebt[]
+  debtPayments?: DebtPayment[]
   version: 4
   vehicles: Vehicle[]
   customers: Customer[]

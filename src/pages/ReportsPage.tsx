@@ -1,3 +1,4 @@
+import { DebtStats } from '../components/Debts'
 import { useMemo, useState } from 'react'
 import { AlertCircle, ArrowDownRight, ArrowUpRight, Car, CircleDollarSign, Download, TrendingUp } from 'lucide-react'
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -35,7 +36,7 @@ export default function ReportsPage(){
   }
   return <div className="fade-up reports-page"><PageHeader eyebrow="Inteligencia de negocio" title="Informes" description="Ingresos, gastos y rentabilidad calculados a partir de los movimientos registrados en la app." action={<button className="btn-primary" disabled={exporting || syncStatus === 'loading'} onClick={exportExcel} title="Descargar informe Excel"><Download size={18}/> {exporting ? 'Generando Excel…' : 'Exportar Excel'}</button>}/>
     {exportMessage&&<p role="status" className="mb-4 rounded-2xl border border-orange-100 bg-brand-50/60 px-4 py-3 text-sm font-semibold text-stone-700">{exportMessage}</p>}
-    <MileageOverview state={state}/>
+    <DebtStats reports/><MileageOverview state={state}/>
     {!hasData?<section className="card"><EmptyState title="No hay datos suficientes para generar informes." description="Cuando registres pagos, gastos de mantenimiento, ITV o impuestos, aparecerán aquí tus gráficos e indicadores."/></section>:<>
       <section className="reports-summary" aria-label="Resumen económico">
         <SummaryCard label="Ingresos cobrados" value={report.summary.totalPaid} detail={`${euro.format(report.summary.monthIncome)} este mes`} icon={ArrowUpRight} tone="income"/>

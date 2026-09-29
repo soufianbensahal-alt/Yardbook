@@ -1,3 +1,5 @@
+import { debtBalance, debtPaymentHistory } from './debts'
+import { maintenanceCosts, materialTotal } from './maintenance'
 import type { CellObject, Feature, Row, Sheet } from 'write-excel-file/browser'
 import { findElement, getCellAddress, getOrderOfSiblings, insertElementMarkupAccordingToOrderOfSiblings } from 'write-excel-file/utility'
 import type { FleetState, Rental } from '../types'
@@ -84,6 +86,8 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
   const rentals = new Map(state.rentals.map(item => [item.id, item]))
   const payments = new Map(state.payments.map(item => [`payment-${item.id}`, item]))
   const sources = new Map<string, { notes: string; concept: string; origin: string }>([
+    ...(state.debtPayments||[]).map(item=>[`debt-payment-${item.id}`,{notes:item.notes,concept:state.debts?.find(d=>d.id===item.debtId)?.reason||'',origin:'Pago de deuda'}] as const),
+    ...state.maintenance.flatMap(m=>(m.materials||[]).map(p=>[`material-${p.id}`,{notes:p.notes,concept:p.name,origin:'Mantenimiento'}] as const)),
     ...state.payments.map(item => [`payment-${item.id}`, { notes: [item.notes, item.flexibleNotes].filter(Boolean).join('\n'), concept: '', origin: 'Pago' }] as const),
     ...state.rentals.map(item => [`rental-${item.id}`, { notes: item.notes, concept: '', origin: 'Alquiler' }] as const),
     ...state.maintenance.map(item => [`maintenance-${item.id}`, { notes: item.notes, concept: item.type, origin: 'Mantenimiento' }] as const),
@@ -102,7 +106,7 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
   }
   const isActive = (r: Rental) => r.status === 'activo' && r.startDate <= today && (!r.endDate || r.endDate >= today)
   const isReservation = (r: Rental) => ['activo', 'pendiente'].includes(r.status) && r.startDate > today
-  const hasData = [state.vehicles, state.customers, state.rentals, state.payments, state.maintenance, state.documents, state.taxes, state.fines, state.clientDocuments].some(items => items.length)
+  const hasData = [state.debts||[],state.debtPayments||[],state.vehicles, state.customers, state.rentals, state.payments, state.maintenance, state.documents, state.taxes, state.fines, state.clientDocuments].some(items => items.length)
   const summary = report.summary
   const summaryRows: Row[] = [
     header(['Monkey Rentals', 'Informe económico y operativo', '', '', '', '']),
@@ -143,7 +147,7 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
   const sheets: ReportSheet[] = [{ sheet: 'Resumen', data: summaryRows, columns: [{ width: 46 }, { width: 34 }, ...Array.from({ length: 4 }, () => ({ width: 22 }))], stickyRowsCount: 1, showGridLines: false, orientation: 'landscape' }]
   sheets.push(table('Ingresos', ['Fecha de cobro', 'Cliente', 'Vehículo', 'Matrícula', 'Tipo de ingreso', 'Estado', 'Importe', 'Método de pago', 'Alquiler relacionado', 'Notas', 'Fecha prevista de cobro'], incomes.map(item => {
     const payment = payments.get(item.id)
-    return [date(payment?.paidDate), text(cname(item.customerId)), text(vname(item.vehicleId)), text(plate(item.vehicleId)), text(item.category), status(item.status), item.status === 'atrasado' ? debt(item.amount) : money(item.amount, item.status === 'pagado' ? colors.green : undefined), text(payment?.method), text(relatedRental(item)), text(sources.get(item.id)?.notes), date(payment?.dueDate || item.date)]
+    return [date(payment?.paidDate || (item.category==='Pago de deuda'?item.date:undefined)), text(cname(item.customerId)), text(vname(item.vehicleId)), text(plate(item.vehicleId)), text(item.category), status(item.status), item.status === 'atrasado' ? debt(item.amount) : money(item.amount, item.status === 'pagado' ? colors.green : undefined), text(payment?.method), text(relatedRental(item)), text(sources.get(item.id)?.notes), date(payment?.dueDate || item.date)]
   }), [total('Total ingresos cobrados', money(summary.totalPaid, colors.green)), total('Total ingresos pendientes', money(summary.totalPending)), total('Total ingresos atrasados', debt(summary.totalOverdue)), total('Total pagos flexibles pendientes (incluidos)', money(summary.flexiblePending)), total('Total general (sin duplicar flexibles)', money(summary.totalExpected))]))
   sheets.push(table('Pagos pendientes', ['Fecha prevista de cobro', 'Cliente', 'Vehículo', 'Matrícula', 'Importe pendiente', 'Tipo de pago', 'Frecuencia del recordatorio', 'Próximo recordatorio', 'Días restantes', 'Notas'], pending.map(item => {
     const p = payments.get(item.id)
@@ -230,5 +234,9 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
   }))
   const kmReport = mileageReport(state, today)
   summaryRows.push([], header(['Kilometraje e ingresos adicionales', 'Total']), total('Ingresos por km extra', money(kmReport.totalPaid)), total('Km extra pendientes de cobro', money(kmReport.pending)), total('Ingresos km extra del mes', money(kmReport.monthIncome)), total('Vehículo con más km extra', text(kmReport.topVehicleId ? vname(kmReport.topVehicleId) : 'Sin excesos')), total('Cliente con más km extra', text(kmReport.topCustomerId ? cname(kmReport.topCustomerId) : 'Sin excesos')), total('Alquileres sin km finales', number(kmReport.missing.length)), [], header(['Mes de cobro', 'Km extra cobrados', 'Ingresos km extra']), ...kmReport.monthly.map(m => [{ ...date(`${m.month}-01`), format:'mm/yyyy' }, number(m.km), money(m.income)]))
+  appendColumns('Mantenimiento', ['Mano de obra', 'Materiales', 'Otros gastos', 'Desglose disponible'], state.maintenance.map(m=>{const c=maintenanceCosts(m);return [money(c.labor),money(c.materials),money(c.other),text(c.legacy?'No; importe anterior sin desglosar':'Sí')]}))
+  sheets.push(table('Materiales y repuestos',['Vehículo','Mantenimiento','Material','Categoría','Cantidad','Precio unitario','Total','Proveedor','Referencia','Fecha de compra','Notas'],state.maintenance.flatMap(m=>(m.materials||[]).map(p=>[text(vname(m.vehicleId)),text(m.type),text(p.name),text(p.category),number(p.quantity),money(p.unitPrice),money(materialTotal(p)),text(p.supplier),text(p.reference),date(p.purchaseDate),text(p.notes)]))))
+  sheets.push(table('Deudas',['Cliente','Fecha','Motivo','Deuda original','Total pagado','Pendiente','Estado'],(state.debts||[]).map(d=>{const b=debtBalance(d,state.debtPayments||[],today);return [text(cname(d.customerId)||d.customerName),date(d.date),text(d.reason),money(d.originalAmount),money(b.paid),debt(b.remaining),status(b.status)]})))
+  sheets.push(table('Pagos de deuda',['Fecha','Cliente','Deuda','Importe pagado','Saldo restante','Método','Referencia','Notas'],(state.debts||[]).flatMap(d=>debtPaymentHistory(d,state.debtPayments||[]).map(p=>[date(p.date),text(cname(d.customerId)||d.customerName),text(d.reason),money(p.amount),debt(p.remaining),text(p.method),text(p.reference),text(p.notes)]))))
   return sheets
 }

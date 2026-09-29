@@ -16,7 +16,7 @@ Deno.test('dispatcher sends once, respects cancellation and never crosses accoun
   config();const originalFetch=globalThis.fetch,originalSend=webpush.sendNotification
   const now=new Date(),day=now.toISOString().slice(0,10),time=now.toISOString().slice(11,16)
   const event={id:'e1',revision:'r1',title:'Llamar al gestor',date:day,time,timezone:'UTC',type:'otro',status:'active',updatedAt:new Date(now.getTime()-86400000).toISOString(),reminders:[{value:0,unit:'minutes'}]}
-  const device={id:'d1',user_id:owner,session_id:'s1',endpoint:'https://fcm.googleapis.com/fcm/send/test',keys:{p256dh:'test',auth:'test'}}
+  const device={id:'d1',user_id:owner,session_id:'s1',endpoint:'https://fcm.googleapis.com/fcm/send/test',keys:{p256dh:'test',auth:'test'},created_at:'2020-01-01T00:00:00Z'}
   const state={events:[event],adminSettings:{notifications:{enabled:true,categories:['otro']}}}
   const claims=new Set<string>(),payloads:Record<string,unknown>[]=[],statuses:string[]=[]
   let cancelled=false,reads=0
@@ -37,6 +37,8 @@ Deno.test('dispatcher sends once, respects cancellation and never crosses accoun
     assert(payloads.length===1,'duplicate send');assert(payloads[0].ownerId===owner);assert(statuses.includes('sent'))
     claims.clear();reads=0;cancelled=true
     await invoke();assert(payloads.length===1,'deleted event sent');assert(statuses.includes('cancelled'))
+    claims.clear();cancelled=false;device.created_at=new Date(Date.now()+60000).toISOString()
+    await invoke();assert(payloads.length===1,'old reminder replayed to a newly enrolled device')
   }finally{globalThis.fetch=originalFetch;webpush.sendNotification=originalSend}
 })
 Deno.test('device enrollment uses verified user, rejects private endpoints, ignores spoofed owner',async()=>{

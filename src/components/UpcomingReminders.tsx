@@ -8,8 +8,8 @@ export function UpcomingReminders({compact=false}:{compact?:boolean}) {
   const items=useMemo(()=>upcomingReminders(state),[state])
   const today=dateInZone(new Date(),state.adminSettings.notifications?.timezone)
   const relative=(day:string)=>Math.round((Date.parse(day)-Date.parse(today))/86400000)
-  const groups=['Hoy','Mañana','Esta semana','Próximamente']
-  const groupFor=(day:string)=>{const days=relative(day);return days===0?0:days===1?1:days<7?2:3}
+  const groups=['Pendientes de revisar','Hoy','Mañana','Esta semana','Próximamente']
+  const groupFor=(day:string)=>{const days=relative(day);return days<0?0:days===0?1:days===1?2:days<7?3:4}
   const system=getSystemAlerts(state)
   const nextCounts=[['Pagos',system.filter(a=>a.paymentId).length],['ITV',system.filter(a=>a.id.startsWith('document-')&&a.title.toLowerCase().includes('itv')).length],['Mantenimiento',system.filter(a=>a.id.startsWith('maintenance-')).length]]
   return <section className="card mb-5 mt-5 p-5" aria-label="Próximas alertas"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl font-bold">Próximas alertas</h2><Link className="text-sm font-bold text-brand-600" to="/app/calendario">Abrir calendario</Link></div>
