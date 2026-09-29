@@ -103,6 +103,8 @@ function normalizeState(value: Partial<FleetState>): FleetState {
     customers:Array.isArray(value.customers) ? value.customers : [],
     rentals:Array.isArray(value.rentals) ? value.rentals : [],
     payments:Array.isArray(value.payments) ? value.payments : [],
+    debts:Array.isArray(value.debts) ? value.debts : [],
+    debtPayments:Array.isArray(value.debtPayments) ? value.debtPayments : [],
     clientDocuments:Array.isArray(value.clientDocuments) ? value.clientDocuments : [],
     tasks:Array.isArray(value.tasks) ? value.tasks : [],
     maintenance:Array.isArray(value.maintenance) ? value.maintenance : [],
@@ -218,6 +220,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   useEffect(() => { stateRef.current = state }, [state])
 
   const saving=useRef<Promise<void>|null>(null)
+  const applyAction=useCallback((action:Action)=>{
+    const next=reducer(stateRef.current,action)
+    stateRef.current=next
+    dispatch({type:'hydrate',state:next})
+  },[])
   const persistChanges=useCallback(async (currentSession:RemoteSession)=>{
     if(saving.current)await saving.current
     const snapshot=stateRef.current
@@ -353,13 +360,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           remoteUpdatedAt.current = remote.updated_at
           lastSyncedState.current = JSON.stringify(remoteState)
           skipNextSave.current = true
+          stateRef.current = remoteState
           dispatch({ type:'hydrate', state:remoteState })
           localStorage.setItem(storageKeyForSession(session), lastSyncedState.current)
           localStorage.setItem(`${storageKeyForSession(session)}:synced`,lastSyncedState.current)
         }
         setSyncStatus('online')
         setSyncError('')
-      } catch {
+      } catch (error) {
         if (!readRemoteSession()) {
           setSession(null)
           setSyncStatus('login')
@@ -367,6 +375,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           return
         }
         setSyncStatus('offline')
+        setSyncError(error instanceof Error ? error.message : 'No se ha podido comprobar la sincronización remota.')
       }
     }
     const onFocus = () => { if (!document.hidden) void refresh() }
@@ -399,6 +408,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       lastRefreshAt.current = 0
       hydrated.current = false
       skipNextSave.current = true
+      stateRef.current = cachedState
       dispatch({ type:'hydrate', state:cachedState })
       localStorage.setItem(cacheKey, lastSyncedState.current)
       setSyncError('')
@@ -419,7 +429,9 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     lastRefreshAt.current = 0
     hydrated.current = !remoteEnabled
     skipNextSave.current = true
-    dispatch({ type:'hydrate', state:structuredClone(emptyState) })
+    const clearedState=structuredClone(emptyState)
+    stateRef.current=clearedState
+    dispatch({ type:'hydrate', state:clearedState })
     setSession(null)
     setSyncStatus(remoteEnabled ? 'login' : 'local')
     setSyncError(message)
@@ -489,18 +501,17 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     },
     saveRental:(rental:Rental,createCharge:boolean)=>{
       const today = new Date().toISOString().slice(0,10)
-      saveRentalMileage(state, rental, createCharge, today)
-      dispatch({type:'saveRentalMileage',rental,createCharge,today})
+      applyAction({type:'saveRentalMileage',rental,createCharge,today})
     },
-    upsert:(collection:Collection,item:Entity)=>{if(collection==='debtPayments')validateDebtPayment(stateRef.current,item as DebtPayment);const next=reducer(stateRef.current,{type:'upsert',collection,item});stateRef.current=next;dispatch({type:'hydrate',state:next})},
-    remove:(collection:Collection,id:string)=>dispatch({type:'remove',collection,id}),
-    dismissMileageAlert:(id:string)=>dispatch({type:'dismissMileageAlert',id}),
-    toggleTask:(id:string)=>dispatch({type:'toggleTask',id}),
-    markPaymentPaid:(id:string)=>dispatch({type:'markPaymentPaid',id}),
-    updateSettings:(settings:AdminSettings)=>dispatch({type:'settings',settings}),
-    reset:()=>dispatch({type:'reset'}),
+    upsert:(collection:Collection,item:Entity)=>{if(collection==='debtPayments')validateDebtPayment(stateRef.current,item as DebtPayment);applyAction({type:'upsert',collection,item})},
+    remove:(collection:Collection,id:string)=>applyAction({type:'remove',collection,id}),
+    dismissMileageAlert:(id:string)=>applyAction({type:'dismissMileageAlert',id}),
+    toggleTask:(id:string)=>applyAction({type:'toggleTask',id}),
+    markPaymentPaid:(id:string)=>applyAction({type:'markPaymentPaid',id}),
+    updateSettings:(settings:AdminSettings)=>applyAction({type:'settings',settings}),
+    reset:()=>applyAction({type:'reset'}),
     signIn, signOut, signOutEverywhere, setRememberSession, retrySync,
-  }), [state, syncStatus, syncError, session, rememberSession, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
+  }), [state, syncStatus, syncError, session, rememberSession, applyAction, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
   return <FleetContext.Provider value={value}>{remoteEnabled && !session ? <LoginScreen error={syncError} onSubmit={signIn}/> : children}</FleetContext.Provider>
 }
 

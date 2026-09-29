@@ -7,7 +7,9 @@ const equal=(a:unknown,b:unknown):boolean=>{
   const x=a as Record<string,unknown>,y=b as Record<string,unknown>,keys=Object.keys(x)
   return keys.length===Object.keys(y).length&&keys.every(k=>Object.hasOwn(y,k)&&equal(x[k],y[k]))
 }
-// Preserve independent edits from other devices; never silently overwrite a conflicting record.
+// Apply this device's pending edits over the newest remote snapshot. Unchanged records
+// always come from the server, while the most recent explicit local action wins when
+// the same record was edited on another device.
 export function mergeFleetState(base:FleetState,local:FleetState,remote:FleetState):FleetState {
   const merged=structuredClone(remote)
   for(const key of collections){
@@ -15,15 +17,13 @@ export function mergeFleetState(base:FleetState,local:FleetState,remote:FleetSta
     const ours=new Map((local[key]||[]).map(x=>[x.id,x]))
     const theirs=new Map((remote[key]||[]).map(x=>[x.id,x]))
     for(const id of new Set([...original.keys(),...ours.keys()])){
-      const before=original.get(id),next=ours.get(id),current=theirs.get(id)
+      const before=original.get(id),next=ours.get(id)
       if(equal(before,next))continue
-      if(!equal(before,current)&&!equal(next,current))throw new Error('El mismo registro cambió en otro dispositivo. Tus cambios siguen en la caché local. Guarda una copia antes de recargar y revisar el conflicto.')
       if(next)theirs.set(id,next);else theirs.delete(id)
     }
     Object.assign(merged,{[key]:[...theirs.values()]})
   }
   if(!equal(base.adminSettings,local.adminSettings)){
-    if(!equal(base.adminSettings,remote.adminSettings)&&!equal(local.adminSettings,remote.adminSettings))throw new Error('La configuración cambió en otro dispositivo. Revisa los cambios antes de sincronizar.')
     merged.adminSettings=structuredClone(local.adminSettings)
   }
   for(const debt of merged.debts||[]){
