@@ -1,6 +1,6 @@
 import { expect,it } from 'vitest'
 import { emptyState } from '../data/emptyState'
-import { mergeFleetState } from './stateMerge'
+import { CACHED_IMAGE_OMITTED, mergeFleetState } from './stateMerge'
 it('combina alertas de dos dispositivos sin borrar ninguna ni duplicar identificadores',()=>{
  const base=structuredClone(emptyState)
  const a={id:'a',title:'ITV',date:'2026-10-01',type:'itv' as const}
@@ -23,4 +23,12 @@ it('conserva pagos simultáneos y bloquea sobrepagos al combinarlos',()=>{
  expect(()=>mergeFleetState(base,{...base,debtPayments:[p]},{...base,debtPayments:[{...p,id:'p2'}]})).toThrow('saldo')
  const merged=mergeFleetState(base,{...base,debtPayments:[p]},{...base,debtPayments:[{...p,id:'p2',amount:40}]})
  expect(merged.debtPayments).toHaveLength(2)
+})
+it('conserva la imagen remota cuando una edición procede de la caché ligera',()=>{
+ const vehicle={id:'v',name:'Furgoneta',plate:'1234ABC',brand:'Ford',model:'Transit',year:2024,category:'Furgoneta',status:'disponible' as const,dailyRate:50,weeklyRate:300,monthlyRate:900,includedKmPerDay:100,extraKmRate:.15,image:'data:image/webp;base64,remota',notes:''}
+ const cached={...vehicle,image:'',notes:'antes',[CACHED_IMAGE_OMITTED]:true}
+ const edited={...cached,notes:'editado'}
+ const merged=mergeFleetState({...emptyState,vehicles:[cached]},{...emptyState,vehicles:[edited]},{...emptyState,vehicles:[vehicle]})
+ expect(merged.vehicles[0]).toMatchObject({image:vehicle.image,notes:'editado'})
+ expect(merged.vehicles[0]).not.toHaveProperty(CACHED_IMAGE_OMITTED)
 })

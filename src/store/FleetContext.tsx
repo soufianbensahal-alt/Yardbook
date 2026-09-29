@@ -1,4 +1,4 @@
-import { mergeFleetState } from '../lib/stateMerge'
+import { CACHED_IMAGE_OMITTED, mergeFleetState } from '../lib/stateMerge'
 import { validateDebtPayment } from '../lib/debts'
 import { clearDeviceOnLogout, reconcileDevice } from '../lib/pushNotifications'
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react'
@@ -14,8 +14,8 @@ import type { ClientDebt, DebtPayment, AdminSettings, CalendarEvent, ClientDocum
 export const STORAGE_KEY = 'monkey-rentals-flota:v4'
 const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2']
 const REMOTE_SAVE_DEBOUNCE_MS = 1200
-const REMOTE_REFRESH_INTERVAL_MS = 60000
-const REMOTE_REFRESH_MIN_GAP_MS = 10000
+const REMOTE_REFRESH_INTERVAL_MS = 5000
+const REMOTE_REFRESH_MIN_GAP_MS = 3000
 type Entity = ClientDebt | DebtPayment | Vehicle | Customer | Rental | Payment | ClientDocument | Task | MaintenanceRecord | Document | VehicleTax | Fine | CalendarEvent
 type Collection = 'debts' | 'debtPayments' | 'vehicles' | 'customers' | 'rentals' | 'payments' | 'clientDocuments' | 'tasks' | 'maintenance' | 'documents' | 'taxes' | 'fines' | 'events'
 type Action =
@@ -129,7 +129,19 @@ function readCachedState(key: string, includeLegacy = true): FleetState | null {
 
 function persistCachedState(key: string, nextState: FleetState) {
   const serialized = JSON.stringify(nextState)
-  localStorage.setItem(key, serialized)
+  const cachedState = key.includes(':user:') ? {
+    ...nextState,
+    vehicles:nextState.vehicles.map(vehicle=>vehicle.image?.startsWith('data:image/')
+      ? {...vehicle,image:'',[CACHED_IMAGE_OMITTED]:true}
+      : vehicle),
+  } : nextState
+  const cachedSerialized=JSON.stringify(cachedState)
+  try { localStorage.setItem(key,cachedSerialized) }
+  catch {
+    // A previous release cached embedded vehicle photos twice and could exhaust
+    // the browser quota. Replace only this derived cache entry and keep syncing.
+    try { localStorage.removeItem(key);localStorage.setItem(key,cachedSerialized) } catch { /* Remote data remains authoritative. */ }
+  }
   return serialized
 }
 
@@ -238,7 +250,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       const merged=mergeFleetState(snapshot,stateRef.current,remote.state)
       remoteUpdatedAt.current=remote.updated_at
       lastSyncedState.current=JSON.stringify(remote.state)
-      localStorage.setItem(`${storageKeyForSession(currentSession)}:synced`,lastSyncedState.current)
+      persistCachedState(`${storageKeyForSession(currentSession)}:synced`,remote.state)
       if(JSON.stringify(merged)!==JSON.stringify(stateRef.current)){
         stateRef.current=merged;skipNextSave.current=true;dispatch({type:'hydrate',state:merged})
       }
@@ -276,7 +288,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         if(getRemoteOwnerId(readRemoteSession())!==getRemoteOwnerId(currentSession))return
         remoteUpdatedAt.current = remote.updated_at
         lastSyncedState.current = JSON.stringify(remoteState)
-        localStorage.setItem(`${cacheKey}:synced`,lastSyncedState.current)
+        persistCachedState(`${cacheKey}:synced`,remoteState)
         skipNextSave.current = true
         stateRef.current=merged
         dispatch({ type:'hydrate', state:merged })
@@ -369,8 +381,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           skipNextSave.current = true
           stateRef.current = remoteState
           dispatch({ type:'hydrate', state:remoteState })
-          localStorage.setItem(storageKeyForSession(session), lastSyncedState.current)
-          localStorage.setItem(`${storageKeyForSession(session)}:synced`,lastSyncedState.current)
+          persistCachedState(storageKeyForSession(session),remoteState)
+          persistCachedState(`${storageKeyForSession(session)}:synced`,remoteState)
         }
         lastRemoteSuccessAt.current=Date.now()
         setSyncStatus('online')
@@ -418,7 +430,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       skipNextSave.current = true
       stateRef.current = cachedState
       dispatch({ type:'hydrate', state:cachedState })
-      localStorage.setItem(cacheKey, lastSyncedState.current)
+      persistCachedState(cacheKey,cachedState)
       setSyncError('')
       setSession(nextSession)
     } catch (error) {

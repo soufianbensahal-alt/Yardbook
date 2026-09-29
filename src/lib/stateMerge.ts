@@ -1,6 +1,7 @@
 import type { FleetState } from '../types'
 import { collections } from './backups'
 import { cents } from './debts'
+export const CACHED_IMAGE_OMITTED='__monkeyCachedImageOmitted'
 const equal=(a:unknown,b:unknown):boolean=>{
   if(a===b)return true
   if(!a||!b||typeof a!=='object'||typeof b!=='object')return false
@@ -19,7 +20,14 @@ export function mergeFleetState(base:FleetState,local:FleetState,remote:FleetSta
     for(const id of new Set([...original.keys(),...ours.keys()])){
       const before=original.get(id),next=ours.get(id)
       if(equal(before,next))continue
-      if(next)theirs.set(id,next);else theirs.delete(id)
+      if(next){
+        const mergedItem=structuredClone(next) as unknown as Record<string,unknown>
+        if(key==='vehicles'&&mergedItem[CACHED_IMAGE_OMITTED]===true){
+          mergedItem.image=(theirs.get(id) as unknown as Record<string,unknown>|undefined)?.image||''
+          delete mergedItem[CACHED_IMAGE_OMITTED]
+        }
+        theirs.set(id,mergedItem as never)
+      }else theirs.delete(id)
     }
     Object.assign(merged,{[key]:[...theirs.values()]})
   }
