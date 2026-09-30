@@ -99,4 +99,17 @@ describe('Modal',()=>{
     expect(input).toHaveValue('abc')
     expect(input).toHaveFocus()
   })
+
+  it('mantiene bloqueado el fondo hasta cerrar todos los modales anidados',()=>{
+    function NestedModals(){
+      const [outer,setOuter]=useState(true),[inner,setInner]=useState(true)
+      return <>{outer&&<Modal title="Exterior" onClose={()=>setOuter(false)}><button onClick={()=>setInner(false)}>Cerrar interior</button>{inner&&<Modal title="Interior" onClose={()=>setInner(false)}>Contenido</Modal>}</Modal>}</>
+    }
+    render(<NestedModals/>)
+    expect(document.body.style.overflow).toBe('hidden')
+    fireEvent.click(screen.getByRole('button',{name:'Cerrar interior'}))
+    expect(document.body.style.overflow).toBe('hidden')
+    fireEvent.click(screen.getByRole('button',{name:'Cerrar'}))
+    expect(document.body.style.overflow).toBe('')
+  })
 })

@@ -198,7 +198,9 @@ interface FleetContextValue {
   restoreFromBackup:(text:string,mode:RestoreMode)=>void
   rememberSession:boolean
   saveRental:(rental:Rental,createCharge:boolean)=>void
+  saveRentalConfirmed:(rental:Rental,createCharge:boolean)=>Promise<void>
   upsert:(collection:Collection,item:Entity)=>void
+  upsertConfirmed:(collection:Collection,item:Entity)=>Promise<void>
   remove:(collection:Collection,id:string)=>void
   dismissMileageAlert:(id:string)=>void
   toggleTask:(id:string)=>void
@@ -508,6 +510,21 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     } else await hydrateFromRemote(session)
   }, [hydrateFromRemote, session,persistChanges])
 
+  const confirmAction = useCallback(async (action:Action) => {
+    if (!remoteEnabled) { applyAction(action); return }
+    if (!session || !hydrated.current) throw new Error('No hay conexión activa con la cuenta. Recupera la conexión antes de guardar.')
+    applyAction(action)
+    setSyncStatus('saving')
+    try {
+      await persistChanges(session)
+      setSyncStatus('online');setSyncError('')
+    } catch (error) {
+      const message=error instanceof Error?error.message:'No se ha podido confirmar el guardado en Supabase.'
+      setSyncStatus('offline');setSyncError(message)
+      throw new Error(message)
+    }
+  },[applyAction,persistChanges,session])
+
   useEffect(()=>{
     if(!session||syncStatus!=='offline')return
     const interval=window.setInterval(()=>void retrySync(),15000)
@@ -530,7 +547,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       const today = new Date().toISOString().slice(0,10)
       applyAction({type:'saveRentalMileage',rental,createCharge,today})
     },
+    saveRentalConfirmed:async(rental:Rental,createCharge:boolean)=>{
+      const today = new Date().toISOString().slice(0,10)
+      await confirmAction({type:'saveRentalMileage',rental,createCharge,today})
+    },
     upsert:(collection:Collection,item:Entity)=>{if(collection==='debtPayments')validateDebtPayment(stateRef.current,item as DebtPayment);applyAction({type:'upsert',collection,item})},
+    upsertConfirmed:async(collection:Collection,item:Entity)=>{if(collection==='debtPayments')validateDebtPayment(stateRef.current,item as DebtPayment);await confirmAction({type:'upsert',collection,item})},
     remove:(collection:Collection,id:string)=>applyAction({type:'remove',collection,id}),
     dismissMileageAlert:(id:string)=>applyAction({type:'dismissMileageAlert',id}),
     toggleTask:(id:string)=>applyAction({type:'toggleTask',id}),
@@ -538,7 +560,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     updateSettings:(settings:AdminSettings)=>applyAction({type:'settings',settings}),
     reset:()=>applyAction({type:'reset'}),
     signIn, signOut, signOutEverywhere, setRememberSession, retrySync,
-  }), [state, syncStatus, syncError, session, rememberSession, applyAction, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
+  }), [state, syncStatus, syncError, session, rememberSession, applyAction, confirmAction, signIn, signOut, signOutEverywhere, setRememberSession, retrySync])
   return <FleetContext.Provider value={value}>{remoteEnabled && !session ? <LoginScreen error={syncError} onSubmit={signIn}/> : children}</FleetContext.Provider>
 }
 

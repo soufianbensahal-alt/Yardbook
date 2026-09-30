@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2, KeyRound, Pencil, Plus, Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { Badge, ConfirmButton, EmptyState, Modal, PageHeader } from '../components/ui'
@@ -7,9 +7,11 @@ import { date, euro, euroWithCents, uid } from '../lib/format'
 import { paymentReminderLabel, recurrenceFromFrequency, reminderFrequencyLabels, suggestedReminderFrequency } from '../lib/paymentReminders'
 import { calculateRecommendedRentalPrice, inferRentalDays, normalizeBillingPeriod, suggestRentalEndDate, type RentalBillingPeriod } from '../lib/rentalPricing'
 import { RentalMileageFields } from '../components/RentalMileageFields'
+import { PrivateFileView } from '../components/PrivateFileView'
+import { deletePrivateFile, uploadPrivateFile } from '../lib/privateFiles'
 import { calculateMileage, getVehicleMileage, mileagePayment } from '../lib/mileage'
 import { vehicleLabel } from '../lib/vehicles'
-import type { FleetState, PricePeriod, ReminderFrequency, Rental, RentalMileage, RentalStatus } from '../types'
+import type { FleetState, PricePeriod, ReminderFrequency, Rental, RentalDocument, RentalDocumentType, RentalMileage, RentalStatus } from '../types'
 
 const tones = { activo:'success', pendiente:'warning', cancelado:'danger', finalizado:'info' } as const
 const periods: Record<PricePeriod, string> = { dia:'día', semana:'semana', mes:'mes', otro:'otro periodo' }
@@ -21,6 +23,8 @@ const billingOptions: Array<{ value: RentalBillingPeriod; label: string }> = [
 ]
 
 type RentalFormValues = RentalMileage & {
+  id: string
+  documents: RentalDocument[]
   createMileageCharge: boolean
   vehicleId: string
   customerId: string
@@ -38,7 +42,7 @@ type RentalFormValues = RentalMileage & {
 }
 
 export default function RentalsPage() {
-  const { state, upsert, remove, saveRental, syncStatus } = useFleet()
+  const { state, upsertConfirmed, remove, saveRentalConfirmed, syncStatus } = useFleet()
   const [params] = useSearchParams()
   const [filter, setFilter] = useState('todos')
   const [query, setQuery] = useState('')
@@ -74,7 +78,7 @@ export default function RentalsPage() {
   }), [state.rentals, customerById, vehicleById, filter, deferred])
 
   const open = (rental: Rental) => { setError(''); setEditing(rental) }
-  const save = (values: RentalFormValues) => {
+  const save = async (values: RentalFormValues) => {
     if (syncStatus === 'loading') { setError('Espera a que termine la sincronización de la cuenta.'); return }
     const vehicle = vehicleById.get(values.vehicleId)
     if (!values.vehicleId || !values.customerId) { setError('Selecciona un cliente y un vehículo.'); return }
@@ -86,7 +90,7 @@ export default function RentalsPage() {
     const item: Rental = {
       ...editing,
       ...rentalValues,
-      id:editing?.id || uid('r'),
+      id:editing?.id || values.id,
       vehicleId:values.vehicleId,
       customerId:values.customerId,
       startDate:values.startDate,
@@ -103,9 +107,9 @@ export default function RentalsPage() {
       notes:values.notes.trim(),
     }
 
-    try { saveRental(item, createMileageCharge) } catch (error) { setError(error instanceof Error ? error.message : 'No se ha podido guardar el kilometraje.'); return }
-    if (!editing?.id && item.nextPaymentDate) upsert('payments', {
-      id:uid('p'),
+    try { await saveRentalConfirmed(item, createMileageCharge) } catch (error) { setError(error instanceof Error ? error.message : 'No se ha podido confirmar el alquiler en Supabase.'); throw error }
+    if (!editing?.id && item.nextPaymentDate) await upsertConfirmed('payments', {
+      id:`payment-${item.id}`,
       rentalId:item.id,
       dueDate:item.nextPaymentDate,
       amount:item.nextPaymentAmount || item.agreedPrice,
@@ -119,7 +123,6 @@ export default function RentalsPage() {
       method:'',
       notes:'',
     })
-    setEditing(null)
   }
   const finalize = (rental: Rental) => {
     open({ ...rental, status:'finalizado', endDate:new Date().toISOString().slice(0, 10) })
@@ -142,7 +145,7 @@ export default function RentalsPage() {
   </div>
 }
 
-function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental; state: FleetState; error: string; onClose: () => void; onSave: (values: RentalFormValues) => void }) {
+function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental; state: FleetState; error: string; onClose: () => void; onSave: (values: RentalFormValues) => Promise<void> }) {
   const initialPeriod = normalizeBillingPeriod(rental.pricePeriod)
   const initialDays = rental.durationDays || inferRentalDays(rental.startDate, rental.endDate) || 1
   const [vehicleId, setVehicleId] = useState(rental.vehicleId)
@@ -162,6 +165,12 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
   const [status, setStatus] = useState<RentalStatus>(rental.status)
   const [notes, setNotes] = useState(rental.notes)
   const [createMileageCharge, setCreateMileageCharge] = useState(false)
+  const rentalId=useRef(rental.id||uid('r')).current
+  const [documents,setDocuments]=useState<RentalDocument[]>(rental.documents||[])
+  const [documentType,setDocumentType]=useState<RentalDocumentType>('signed_contract')
+  const [fileBusy,setFileBusy]=useState(false),[fileError,setFileError]=useState('')
+  const staged=useRef<RentalDocument[]>([]),removed=useRef<RentalDocument[]>([]),saved=useRef(false)
+  useEffect(()=>()=>{if(!saved.current)for(const file of staged.current)void deletePrivateFile(file,'rental').catch(()=>{})},[])
   const [mileage, setMileage] = useState<RentalMileage>(() => ({
     ...rental,
     kmStart: rental.kmStart ?? (!rental.id ? getVehicleMileage(state, rental.vehicleId).currentKm : undefined),
@@ -190,9 +199,16 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
     return () => window.clearTimeout(timeout)
   }, [daysNumber, endDateTouched, pricePeriod, startDate, validDays])
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const uploadDocuments=async(files:FileList|null)=>{if(!files?.length)return;setFileBusy(true);setFileError('');try{for(const file of Array.from(files)){const stored=await uploadPrivateFile(file,{type:'rental',recordId:rentalId,vehicleId,customerId,documentType}) as RentalDocument;staged.current.push(stored);setDocuments(current=>[...current,stored])}}catch(err){setFileError(err instanceof Error?err.message:'No se ha podido subir el documento.')}finally{setFileBusy(false)}}
+  const removeDocument=(file:RentalDocument)=>{setDocuments(current=>current.filter(item=>item.id!==file.id));if(!staged.current.some(item=>item.id===file.id))removed.current.push(file)}
+  const [submitting,setSubmitting]=useState(false)
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onSave({
+    if(fileBusy||submitting)return
+    setSubmitting(true);setFileError('')
+    try {await onSave({
+      id:rentalId,
+      documents,
       ...mileageValue,
       createMileageCharge: createMileageCharge && status === 'finalizado' && !!mileage.kmExtraEnabled && (calculateMileage(mileageValue, selectedVehicle).total ?? 0) > 0,
       vehicleId,
@@ -208,7 +224,7 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
       paymentReminderFrequency,
       status,
       notes,
-    })
+    });await Promise.all(removed.current.map(file=>deletePrivateFile(file,'rental')));const retained=new Set(documents.map(file=>file.id));await Promise.all(staged.current.filter(file=>!retained.has(file.id)).map(file=>deletePrivateFile(file,'rental')));saved.current=true;onClose()}catch{ /* El formulario padre conserva y muestra el error de guardado. */ }finally{setSubmitting(false)}
   }
   const recalculate = () => {
     if (recommendedPrice === null) return
@@ -252,7 +268,8 @@ function RentalModal({ rental, state, error, onClose, onSave }: { rental: Rental
       <label><span className="label">Recordatorio de pago</span><select name="paymentReminderFrequency" className="field" value={paymentReminderFrequency} onChange={event => { setPaymentReminderFrequency(event.target.value as ReminderFrequency); setReminderTouched(true) }}>{(['none','once','daily','weekly','biweekly','monthly','custom'] as ReminderFrequency[]).map(value => <option key={value} value={value}>{reminderFrequencyLabels[value]}</option>)}</select></label>
       <p className="self-end rounded-xl bg-brand-50 p-3 text-sm text-stone-600">La app sugiere el recordatorio según el periodo, pero puedes cambiarlo. “Una vez” no genera otro vencimiento al cobrar.</p>
       <label className="sm:col-span-2"><span className="label">Notas</span><textarea name="notes" className="field min-h-24" value={notes} onChange={event => setNotes(event.target.value)}/></label>
-      <div className="flex gap-3 sm:col-span-2 sm:justify-end"><button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-primary">Guardar alquiler</button></div>
+      <fieldset className="space-y-3 rounded-xl border border-orange-100 p-4 sm:col-span-2"><legend className="px-2 font-display text-lg font-bold">Documentos del alquiler</legend><p className="text-sm text-stone-500">Adjunta el contrato firmado u otros documentos en PDF o imagen. Máximo 10 MB por archivo.</p>{fileError&&<p role="alert" className="text-sm font-semibold text-red-700">{fileError}</p>}<div className="flex flex-wrap gap-3">{documents.map(file=><PrivateFileView key={file.id} file={file} target="rental" onRemove={()=>removeDocument(file)}/>)}</div><div className="grid gap-3 sm:grid-cols-2"><label><span className="label">Tipo de documento</span><select className="field" value={documentType} onChange={event=>setDocumentType(event.target.value as RentalDocumentType)}><option value="signed_contract">Contrato firmado</option><option value="delivery_document">Documento de entrega</option><option value="return_document">Documento de devolución</option><option value="other">Otro</option></select></label><label><span className="label">Archivo</span><input className="field" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={fileBusy||submitting} onChange={event=>{void uploadDocuments(event.target.files);event.target.value=''}}/></label></div><label><span className="label">Foto desde el móvil</span><input className="field" type="file" accept="image/*" capture="environment" disabled={fileBusy||submitting} onChange={event=>{void uploadDocuments(event.target.files);event.target.value=''}}/></label></fieldset>
+      <div className="flex gap-3 sm:col-span-2 sm:justify-end"><button type="button" className="btn-secondary" disabled={fileBusy||submitting} onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={fileBusy||submitting}>{fileBusy?'Subiendo archivo…':submitting?'Guardando en Supabase…':'Guardar alquiler'}</button></div>
     </form>
   </Modal>
 }

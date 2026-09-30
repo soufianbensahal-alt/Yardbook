@@ -219,12 +219,20 @@ export async function callNotificationService(body:Record<string,unknown>) {
 
 export async function privateStorage(path:string,init:RequestInit={}) {
   const session=readRemoteSession()
-  if(!session||!remoteEnabled)throw new Error('Inicia sesión y conecta con Supabase para guardar fotografías.')
+  if(!session||!remoteEnabled)throw new Error('Inicia sesión y conecta con Supabase para guardar archivos.')
   const response=await authedFetch(`${config.url}/storage/v1/${path}`,session,init,init.body instanceof Blob?{'Content-Type':init.body.type}:{})
-  if(!response.ok)throw new Error('No se ha podido acceder a la fotografía privada. Comprueba la conexión y vuelve a intentarlo.')
+  if(!response.ok)throw new Error('No se ha podido acceder al archivo privado. Comprueba la conexión y vuelve a intentarlo.')
   return response
 }
 export function storageSignedUrl(path:string) {return `${config.url}/storage/v1${path}`}
+
+export async function privateTable(table:string,query:string,init:RequestInit={}) {
+  const session=readRemoteSession()
+  if(!session||!remoteEnabled)throw new Error('Inicia sesión y conecta con Supabase para guardar archivos.')
+  const response=await authedFetch(`${config.url}/rest/v1/${table}${query}`,session,init,{Prefer:init.method==='POST'?'resolution=merge-duplicates,return=minimal':'return=minimal'})
+  if(!response.ok)throw new Error('No se han podido guardar los datos del archivo privado.')
+  return response
+}
 
 export async function saveRemoteChanges(state:FleetState,base:FleetState,session:RemoteSession):Promise<RemoteRow> {
   const {mergeFleetState}=await import('./stateMerge')
