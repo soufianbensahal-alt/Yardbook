@@ -15,7 +15,7 @@ export const emptyState: FleetState = {
   events: [],
   adminSettings: {
     name: 'Jonathan',
-    company: 'Monkey Rentals',
+    company: 'Yardbook',
     email: '',
     phone: '',
   },

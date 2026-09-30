@@ -16,9 +16,9 @@ export function AppIntro({ children }: { children: ReactNode }) {
 
   return <>
     {children}
-    {visible && <section className="app-intro" role="status" aria-label="Iniciando Monkey Rentals">
+    {visible && <section className="app-intro" role="status" aria-label="Iniciando Yardbook">
       <div className="app-intro-logo-wrap">
-        <img src="/monkey-rentals-logo.png" alt="" className="app-intro-logo" />
+        <img src="/yardbook-mark.svg" alt="" className="app-intro-logo" />
       </div>
     </section>}
   </>

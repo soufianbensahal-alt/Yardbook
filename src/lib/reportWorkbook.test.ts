@@ -98,7 +98,7 @@ describe('Excel completo de Informes', () => {
     const second = buildReportWorkbook(other, today, 'second@example.test')
     expect(JSON.stringify(second)).not.toContain('ana@example.test')
     expect(JSON.stringify(second)).not.toContain('first@example.test')
-    expect(reportExcelFilename(today)).toBe('monkey-rentals-informe-2026-09-13.xlsx')
+    expect(reportExcelFilename(today)).toBe('yardbook-informe-2026-09-13.xlsx')
   })
 
   it('inserta filtros antes de merges y fuera de los totales', () => {

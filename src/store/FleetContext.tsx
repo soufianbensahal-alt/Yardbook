@@ -11,8 +11,8 @@ import { getNextPaymentDate } from '../lib/paymentReminders'
 import { applyLoginTheme, applyTheme, getSavedLoginThemeMode, getSavedTheme, saveLoginThemeMode, type ThemeMode } from '../lib/theme'
 import type { ClientDebt, DebtPayment, AdminSettings, CalendarEvent, ClientDocument, Customer, Document, Fine, FleetState, MaintenanceRecord, Payment, Rental, Task, Vehicle, VehicleTax } from '../types'
 
-export const STORAGE_KEY = 'monkey-rentals-flota:v4'
-const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v3','monkey-rentals-flota:v2']
+export const STORAGE_KEY = 'yardbook-flota:v4'
+const LEGACY_STORAGE_KEYS = ['monkey-rentals-flota:v4','monkey-rentals-flota:v3','monkey-rentals-flota:v2']
 const REMOTE_SAVE_DEBOUNCE_MS = 1200
 const REMOTE_REFRESH_INTERVAL_MS = 5000
 const REMOTE_REFRESH_MIN_GAP_MS = 3000
@@ -123,7 +123,10 @@ function storageKeyForSession(session: RemoteSession | null) {
 }
 
 function readCachedState(key: string, includeLegacy = true): FleetState | null {
-  const stored = localStorage.getItem(key) ?? (includeLegacy ? LEGACY_STORAGE_KEYS.map(legacyKey=>localStorage.getItem(legacyKey)).find(Boolean) : undefined)
+  const legacyEquivalent=key.replace(/^yardbook-flota:v4/,'monkey-rentals-flota:v4')
+  const legacyStored=localStorage.getItem(legacyEquivalent) ?? (includeLegacy ? LEGACY_STORAGE_KEYS.map(legacyKey=>localStorage.getItem(legacyKey)).find(Boolean) : undefined)
+  const stored=localStorage.getItem(key) ?? legacyStored
+  if(!localStorage.getItem(key)&&legacyStored)localStorage.setItem(key,legacyStored)
   return parseCachedState(stored)
 }
 
@@ -602,8 +605,8 @@ function LoginScreen({error,onSubmit}:{error:string;onSubmit:(email:string,passw
   }
   return <main className="login-screen grid min-h-dvh place-items-center bg-cream p-4">
     <form onSubmit={submit} className="login-card card w-full max-w-md p-6 sm:p-8">
-      <img src="/monkey-rentals-logo.png" alt="" className="mx-auto size-20 object-contain"/>
-      <h1 className="mt-4 text-center font-display text-2xl font-bold text-ink">Acceso Monkey Rentals</h1>
+      <img src="/yardbook-mark.svg" alt="" className="mx-auto size-20 object-contain"/>
+      <h1 className="mt-4 text-center font-display text-2xl font-bold text-ink">Acceso Yardbook</h1>
       <p className="mt-2 text-center text-sm text-stone-500">Inicia sesión para sincronizar la flota en todos los dispositivos.</p>
       <div className="login-theme-switcher mt-5" role="group" aria-label="Aspecto del login">
         {loginThemeOptions.map(({value,label,icon:Icon})=><button key={value} type="button" className="login-theme-button" aria-pressed={themeMode===value} onClick={()=>chooseTheme(value)}>

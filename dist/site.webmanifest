@@ -1,13 +1,13 @@
 {
-  "name": "Monkey Rentals",
-  "short_name": "Monkey Rentals",
-  "description": "Gestión de flota, alquileres, cobros y mantenimiento de Monkey Rentals.",
+  "name": "Yardbook",
+  "short_name": "Yardbook",
+  "description": "Tu flota. Bajo control.",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "theme_color": "#f97316",
-  "background_color": "#111111",
+  "theme_color": "#F56B2A",
+  "background_color": "#F5F3EC",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

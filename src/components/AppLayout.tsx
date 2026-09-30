@@ -82,7 +82,7 @@ export function AppLayout() {
   const noticesPanelRef = useRef<HTMLElement>(null)
   const alerts = getSystemAlerts(state)
   const current = desktopNav.find(item => item.end ? location.pathname === item.to : location.pathname.startsWith(item.to))?.label
-    ?? 'Monkey Rentals'
+    ?? 'Yardbook'
   const secondaryActive = secondaryNav.some(item => item.to !== '/app/calendario' && location.pathname.startsWith(item.to))
   const vehicleStatuses = useMemo(() => getVehicleStatusMap(state), [state])
 
@@ -157,7 +157,7 @@ export function AppLayout() {
   </>,document.body):null
 
   const mobileNavigationLayer=createPortal(<>
-    {moreOpen && <><button className="fixed inset-0 z-50 bg-stone-950/45 backdrop-blur-[2px] md:hidden" onClick={() => setMoreOpen(false)} aria-label="Cerrar más opciones"/><section className="mobile-more-sheet md:hidden" aria-label="Más secciones"><div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/25"/><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><img src="/monkey-rentals-logo.png" alt="Monkey Rentals" className="mobile-more-logo"/><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.16em] text-brand-500">Monkey Rentals</p><h2 className="mt-1 truncate font-display text-xl font-extrabold text-white">Más secciones</h2></div></div><button className="mobile-sheet-close" onClick={() => setMoreOpen(false)} aria-label="Cerrar"><X size={20}/></button></div><nav className="mt-5 grid grid-cols-2 gap-2" aria-label="Navegación secundaria">{secondaryNav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMoreOpen(false)} className={({ isActive }) => `mobile-more-link ${isActive ? 'mobile-more-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}</nav>{remoteEnabled&&<button className="mobile-signout-button" onClick={()=>{setMoreOpen(false);signOut()}}><LogOut size={20}/><span>Cerrar sesión</span></button>}</section></>}
+    {moreOpen && <><button className="fixed inset-0 z-50 bg-stone-950/45 backdrop-blur-[2px] md:hidden" onClick={() => setMoreOpen(false)} aria-label="Cerrar más opciones"/><section className="mobile-more-sheet md:hidden" aria-label="Más secciones"><div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/25"/><div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><img src="/yardbook-mark.svg" alt="Yardbook" className="mobile-more-logo"/><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.16em] text-brand-500">Yardbook</p><h2 className="mt-1 truncate font-display text-xl font-extrabold text-white">Más secciones</h2></div></div><button className="mobile-sheet-close" onClick={() => setMoreOpen(false)} aria-label="Cerrar"><X size={20}/></button></div><nav className="mt-5 grid grid-cols-2 gap-2" aria-label="Navegación secundaria">{secondaryNav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMoreOpen(false)} className={({ isActive }) => `mobile-more-link ${isActive ? 'mobile-more-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}</nav>{remoteEnabled&&<button className="mobile-signout-button" onClick={()=>{setMoreOpen(false);signOut()}}><LogOut size={20}/><span>Cerrar sesión</span></button>}</section></>}
 
     <nav className="mobile-bottom-nav md:hidden" aria-label="Navegación móvil">
       {primaryNav.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `mobile-nav-link ${isActive ? 'mobile-nav-link-active' : ''}`}><Icon size={21}/><span>{label}</span></NavLink>)}
@@ -166,18 +166,19 @@ export function AppLayout() {
   </>,document.body)
 
   return <div className="min-h-dvh bg-cream md:flex">
-    <aside className={`app-sidebar hidden h-dvh flex-col border-r border-orange-100 bg-white text-ink md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
-      <div className={`flex h-20 items-center border-b border-orange-100 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}><Brand compact={collapsed}/></div>
+    <a href="#main-content" className="skip-link">Saltar al contenido</a>
+    <aside className={`app-sidebar hidden h-dvh flex-col border-r border-white/10 bg-ink text-white md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
+      <div className={`flex h-20 items-center border-b border-white/10 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}><Brand compact={collapsed} light/></div>
       <nav className="flex-1 overflow-y-auto p-3" aria-label="Navegación principal">
         {desktopNav.map(({ to, label, icon: Icon, end }) => <NavLink
           key={to}
           to={to}
           end={end}
           title={collapsed ? label : undefined}
-          className={({ isActive }) => `sidebar-link mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'sidebar-link-active bg-brand-500 text-white shadow-md shadow-orange-200' : 'text-stone-600 hover:bg-brand-50 hover:text-brand-700'} ${collapsed ? 'justify-center' : ''}`}
+          className={({ isActive }) => `sidebar-link mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'sidebar-link-active bg-brand-500 text-white shadow-md shadow-orange-200' : 'text-stone-300 hover:bg-white/10 hover:text-white'} ${collapsed ? 'justify-center' : ''}`}
         ><Icon size={20}/><span className={collapsed ? 'hidden' : ''}>{label}</span></NavLink>)}
       </nav>
-      <button className="sidebar-collapse m-3 flex size-11 items-center justify-center self-center rounded-xl border border-orange-100 text-stone-600 hover:bg-brand-50" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}>{collapsed ? <ChevronRight/> : <ChevronLeft/>}</button>
+      <button className="sidebar-collapse m-3 flex size-11 items-center justify-center self-center rounded-xl border border-white/15 text-stone-300 hover:bg-white/10" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}>{collapsed ? <ChevronRight/> : <ChevronLeft/>}</button>
     </aside>
 
     <div className="min-w-0 flex-1">
@@ -185,7 +186,7 @@ export function AppLayout() {
         <NavLink to="/app/calendario" className={({ isActive }) => `mobile-calendar-shortcut md:hidden ${isActive ? 'mobile-calendar-shortcut-active' : ''}`} aria-label="Abrir calendario"><CalendarDays size={20}/></NavLink>
         <button className="icon-btn hidden shrink-0 md:inline-flex" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menú' : 'Alternar menú'} aria-expanded={!collapsed}><Menu/></button>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-600 sm:text-xs">Monkey Rentals</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-600 sm:text-xs">Yardbook</p>
           <p className="truncate font-display text-base font-bold text-ink sm:text-lg">{current}</p>
         </div>
         <div className="relative hidden max-w-sm flex-1 md:block">

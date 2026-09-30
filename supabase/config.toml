@@ -1,4 +1,4 @@
-project_id = "monkey-rentals"
+project_id = "yardbook"
 
 [functions.notification-device]
 verify_jwt = true

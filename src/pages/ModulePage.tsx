@@ -31,7 +31,7 @@ function SettingsPage(){
   const save=(e:FormEvent<HTMLFormElement>)=>{
     e.preventDefault()
     const f=new FormData(e.currentTarget)
-    updateSettings({...state.adminSettings,name:String(f.get('name')).trim()||'Jonathan',company:String(f.get('company')).trim()||'Monkey Rentals',email:String(f.get('email')).trim(),phone:String(f.get('phone')).trim()})
+    updateSettings({...state.adminSettings,name:String(f.get('name')).trim()||'Jonathan',company:String(f.get('company')).trim()||'Yardbook',email:String(f.get('email')).trim(),phone:String(f.get('phone')).trim()})
     setSaved(true)
   }
   const toggleRemember=(enabled:boolean)=>{

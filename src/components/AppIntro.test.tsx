@@ -9,9 +9,9 @@ describe('AppIntro', () => {
     vi.useFakeTimers()
     render(<AppIntro><main>Aplicacion</main></AppIntro>)
 
-    expect(screen.getByRole('status', { name:'Iniciando Monkey Rentals' })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name:'Iniciando Yardbook' })).toBeInTheDocument()
     act(() => vi.advanceTimersByTime(1600))
-    expect(screen.queryByRole('status', { name:'Iniciando Monkey Rentals' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('status', { name:'Iniciando Yardbook' })).not.toBeInTheDocument()
     expect(screen.getByText('Aplicacion')).toBeInTheDocument()
   })
 })

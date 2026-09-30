@@ -109,7 +109,7 @@ export function buildReportWorkbook(state: FleetState, today: string, generatedB
   const hasData = [state.debts||[],state.debtPayments||[],state.vehicles, state.customers, state.rentals, state.payments, state.maintenance, state.documents, state.taxes, state.fines, state.clientDocuments].some(items => items.length)
   const summary = report.summary
   const summaryRows: Row[] = [
-    header(['Monkey Rentals', 'Informe económico y operativo', '', '', '', '']),
+    header(['Yardbook', 'Informe económico y operativo', '', '', '', '']),
     [text('Fecha de generación'), date(today)],
     [text('Generado por'), text(generatedBy || state.adminSettings.name || state.adminSettings.email)],
     [text('Periodo analizado'), { ...text('Todos los registros disponibles. Los indicadores del mes corresponden al mes de generación.'), columnSpan: 5 }],

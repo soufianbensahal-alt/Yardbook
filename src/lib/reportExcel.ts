@@ -1,7 +1,7 @@
 import { economicMovements, type EconomicMovement } from './reports'
 import type { FleetState } from '../types'
 
-export const reportExcelFilename = (today: string) => `monkey-rentals-informe-${today}.xlsx`
+export const reportExcelFilename = (today: string) => `yardbook-informe-${today}.xlsx`
 
 export interface ReportExcelSummary {
   paidIncome: number

@@ -46,6 +46,6 @@ describe('copias de seguridad',()=>{
     expect(nextBackupDate({...prefs,frequency:'manual'})).toBeNull()
     expect(nextBackupDate({...prefs,frequency:'weekly'})?.getDate()).toBe(7)
     expect(nextBackupDate({...prefs,history:[]})?.getTime()).toBe(new Date(prefs.enabledAt).getTime())
-    expect(backupFilename(new Date(2026,8,17,13,45))).toBe('monkey-rentals-backup-2026-09-17-13-45.json')
+    expect(backupFilename(new Date(2026,8,17,13,45))).toBe('yardbook-backup-2026-09-17-13-45.json')
   })
 })

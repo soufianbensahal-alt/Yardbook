@@ -4,7 +4,7 @@ import type { FleetState } from '../types'
 export const collections = ['vehicles','customers','rentals','payments','clientDocuments','tasks','maintenance','documents','taxes','fines','events','debts','debtPayments'] as const
 export const collectionLabels = ['Vehículos','Clientes','Alquileres y reservas','Pagos y recordatorios','Referencias de documentos de clientes','Tareas','Mantenimiento y reparaciones','ITV / Documentación','Impuestos','Multas','Calendario','Deudas','Pagos de deuda']
 export type RestoreMode = 'merge' | 'replace'
-export interface Backup { app:'Monkey Rentals'; backup_version:'1.0'; generated_at:string; user_id:string; data:FleetState }
+export interface Backup { app:'Yardbook'|'Monkey Rentals'; backup_version:'1.0'; generated_at:string; user_id:string; data:FleetState }
 export const frequencies = { manual:'Solo manual', daily:'Cada día', weekly:'Cada semana', biweekly:'Cada 15 días', monthly:'Cada mes' }
 export type Frequency = keyof typeof frequencies
 export interface BackupLog { date:string; status:'download'|'saved'|'error'; name:string }
@@ -26,7 +26,7 @@ export function parseBackup(text:string, owner:string|null):Backup {
   if (text.length > 50 * 1024 * 1024) throw new Error('La copia supera el límite de 50 MB.')
   let value:Backup
   try { value=JSON.parse(text) } catch { throw new Error('El archivo no contiene JSON válido.') }
-  if (!value || value.app !== 'Monkey Rentals' || value.backup_version !== '1.0') throw new Error('No es una copia compatible de Monkey Rentals.')
+  if (!value || !['Yardbook','Monkey Rentals'].includes(value.app) || value.backup_version !== '1.0') throw new Error('No es una copia compatible de Yardbook.')
   if (value.user_id !== owner) throw new Error('Esta copia pertenece a otra cuenta.')
   if (Object.keys(value).some(k=>!['app','backup_version','generated_at','user_id','data'].includes(k)) || typeof value.generated_at !== 'string' || !Number.isFinite(Date.parse(value.generated_at)) || !matches(value.data,schema as Schema)) throw new Error('La copia contiene campos inesperados o datos incorrectos.')
   for (const key of collections) {
@@ -40,7 +40,7 @@ export function parseBackup(text:string, owner:string|null):Backup {
 export function createBackup(state:FleetState, owner:string|null, now=new Date()):Backup {
   const data=structuredClone(state)
   data.clientDocuments=data.clientDocuments.map(doc=>({...doc,dataUrl:''}))
-  return parseBackup(JSON.stringify({app:'Monkey Rentals',backup_version:'1.0',generated_at:now.toISOString(),user_id:owner,data}),owner)
+  return parseBackup(JSON.stringify({app:'Yardbook',backup_version:'1.0',generated_at:now.toISOString(),user_id:owner,data}),owner)
 }
 export function restoreBackup(current:FleetState, backup:Backup, mode:RestoreMode):FleetState {
   const next=structuredClone(backup.data)
@@ -61,7 +61,7 @@ export function restoreBackup(current:FleetState, backup:Backup, mode:RestoreMod
 }
 export function backupFilename(now=new Date()) {
   const pad=(n:number)=>String(n).padStart(2,'0')
-  return `monkey-rentals-backup-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(now.getMinutes())}.json`
+  return `yardbook-backup-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(now.getMinutes())}.json`
 }
 export function nextBackupDate(prefs:BackupPreferences):Date|null {
   if (prefs.frequency==='manual') return null

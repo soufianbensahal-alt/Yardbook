@@ -42,7 +42,7 @@ describe('AppLayout navigation',()=>{
     const secondaryNav=screen.getByRole('navigation',{name:'Navegación secundaria'})
     expect(secondaryNav).toBeInTheDocument()
     expect(secondaryNav.closest('section')?.parentElement).toBe(document.body)
-    expect(screen.getByRole('img',{name:'Monkey Rentals'})).toBeInTheDocument()
+    expect(screen.getByRole('img',{name:'Yardbook'})).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button',{name:'Cerrar'}))
     expect(screen.queryByRole('navigation',{name:'Navegación secundaria'})).not.toBeInTheDocument()
   })

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" role="img" aria-labelledby="title">
+  <title id="title">yardbook</title>
+  <g transform="translate(4 8)">
+    <path fill="#F56B2A" d="M0 0h20l12 23v51H15V30L0 0Z"/>
+    <path fill="#F56B2A" d="M64 0H44L32 23v51h17V30L64 0Z"/>
+  </g>
+  <text x="84" y="63" fill="#F5F3EC" font-family="Inter, Avenir Next, Segoe UI, sans-serif" font-size="58" font-weight="750" letter-spacing="-2">yardbook</text>
+</svg>

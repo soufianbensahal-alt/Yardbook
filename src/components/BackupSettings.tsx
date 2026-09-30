@@ -15,7 +15,10 @@ function readPreferences(owner:string|null):BackupPreferences {
   const fallback:BackupPreferences={frequency:'manual',enabledAt:new Date().toISOString(),history:[]}
   if (!owner) return fallback
   try {
-    const data=JSON.parse(localStorage.getItem(`monkey-backups:${owner}`)||'null')
+    const key=`yardbook-backups:${owner}`,legacyKey=`monkey-backups:${owner}`
+    const stored=localStorage.getItem(key)??localStorage.getItem(legacyKey)
+    if(!localStorage.getItem(key)&&stored)localStorage.setItem(key,stored)
+    const data=JSON.parse(stored||'null')
     if (!data || !Object.hasOwn(frequencies,data.frequency) || !Number.isFinite(Date.parse(data.enabledAt)) || !Array.isArray(data.history)) return fallback
     return {...data,history:data.history.filter((h:{date:string;status:string;name:string})=>h && Number.isFinite(Date.parse(h.date)) && ['download','saved','error'].includes(h.status) && typeof h.name==='string').slice(0,20)}
   } catch { return fallback }
@@ -30,14 +33,14 @@ function useBackups() {
   useEffect(()=>{
     const update=()=>{setPrefs(readPreferences(ownerId));setNow(Date.now())}
     update()
-    window.addEventListener('monkey-backups',update); window.addEventListener('storage',update)
+    window.addEventListener('yardbook-backups',update); window.addEventListener('storage',update)
     const timer=window.setInterval(()=>setNow(Date.now()),60000)
-    return ()=>{window.removeEventListener('monkey-backups',update);window.removeEventListener('storage',update);window.clearInterval(timer)}
+    return ()=>{window.removeEventListener('yardbook-backups',update);window.removeEventListener('storage',update);window.clearInterval(timer)}
   },[ownerId])
   const persist=(next:BackupPreferences)=>{
     if (!ownerId) throw new Error('Inicia sesión para gestionar tus copias.')
-    localStorage.setItem(`monkey-backups:${ownerId}`,JSON.stringify(next));setPrefs(next)
-    window.dispatchEvent(new Event('monkey-backups'))
+    localStorage.setItem(`yardbook-backups:${ownerId}`,JSON.stringify(next));setPrefs(next)
+    window.dispatchEvent(new Event('yardbook-backups'))
   }
   const allowed=Boolean(ownerId)&&syncStatus!=='loading'
   const record=(date:string,status:'download'|'saved',name:string,message:string)=>{const next={...readPreferences(ownerId),history:[{date,status,name},...readPreferences(ownerId).history].slice(0,20)};try{persist(next);setMessage(message)}catch{setMessage(`${message} El navegador no ha permitido guardar el historial.`)}}
@@ -97,7 +100,7 @@ export function BackupSettings() {
     } catch(error) { backup.setMessage(error instanceof Error?error.message:'No se ha podido restaurar la copia.');setPreview(null) }
   }
   return <section id="copias-seguridad" className="card mt-5 p-5 sm:p-6">
-    <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><Archive size={22}/></span><div><h2 className="font-display text-xl font-bold">Copias de seguridad</h2><p className="mt-1 text-sm text-stone-500">Crea un archivo ZIP administrativo que puede consultarse sin Monkey Rentals.</p></div></div>
+    <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><Archive size={22}/></span><div><h2 className="font-display text-xl font-bold">Copias de seguridad</h2><p className="mt-1 text-sm text-stone-500">Crea un archivo ZIP administrativo que puede consultarse sin Yardbook.</p></div></div>
     <div className="mt-5 rounded-2xl border border-orange-100 bg-brand-50/60 p-4"><p className="font-bold text-ink">La copia incluye</p><p className="mt-1 text-sm leading-6 text-stone-600">Excels separados para clientes, flota, alquileres, pagos, mantenimientos, documentación, multas, calendario, informes y configuración; además de fotografías, contratos, facturas y otros adjuntos disponibles.</p><p className="mt-2 text-xs font-medium text-stone-500">Contiene información privada. Guárdala en un ordenador, USB o disco protegido.</p></div>
     {!ownerId&&<p className="mt-3 font-semibold">Inicia sesión en tu cuenta para crear o restaurar copias.</p>}
     {syncStatus==='offline'&&<p className="mt-3 text-sm">Sin conexión: la copia incluirá los últimos datos disponibles en este dispositivo.</p>}

@@ -12,7 +12,7 @@ async function bindOwner(reg:ServiceWorkerRegistration,owner:string|null) {
   })
 }
 export async function enableDevice(owner:string) {
-  if(!supportsPush())throw new Error('Este navegador no permite Web Push. En iPhone, añade Monkey Rentals a la pantalla de inicio y ábrela desde allí.')
+  if(!supportsPush())throw new Error('Este navegador no permite Web Push. En iPhone, añade Yardbook a la pantalla de inicio y ábrela desde allí.')
   // Must be requested directly from the user's click, before a network await (iOS).
   const permission=await Notification.requestPermission()
   if(permission!=='granted')throw new Error('Permiso no concedido. Los avisos seguirán disponibles en Calendario y Alertas.')
@@ -25,10 +25,10 @@ export async function enableDevice(owner:string) {
   if(!subscription)subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key})
   await callNotificationService({action:'subscribe',subscription:subscription.toJSON(),...deviceInfo()})
   await bindOwner(reg,owner)
-  localStorage.setItem(`monkey-push-enabled:${owner}`,'true')
+  localStorage.setItem(`yardbook-push-enabled:${owner}`,'true')
 }
 export async function disableDevice() {
-  const owner=getRemoteOwnerId(readRemoteSession());if(owner)localStorage.removeItem(`monkey-push-enabled:${owner}`)
+  const owner=getRemoteOwnerId(readRemoteSession());if(owner)localStorage.removeItem(`yardbook-push-enabled:${owner}`)
   if(!('serviceWorker' in navigator))return
   const reg=await navigator.serviceWorker.getRegistration('/')
   if(!reg)return
@@ -41,7 +41,7 @@ export async function disableDevice() {
   for(const notification of await reg.getNotifications())notification.close()
 }
 export async function clearDeviceOnLogout() {
-  const owner=getRemoteOwnerId(readRemoteSession());if(owner)localStorage.removeItem(`monkey-push-enabled:${owner}`)
+  const owner=getRemoteOwnerId(readRemoteSession());if(owner)localStorage.removeItem(`yardbook-push-enabled:${owner}`)
   if(!('serviceWorker' in navigator))return
   const reg=await navigator.serviceWorker.getRegistration('/')
   if(!reg)return
@@ -67,12 +67,15 @@ export async function reconcileDevice(owner:string) {
   const reg=await registration()
   let sub=await reg.pushManager.getSubscription()
   if(!sub){
-    if(localStorage.getItem(`monkey-push-enabled:${owner}`)!=='true')return
+    const enabledKey=`yardbook-push-enabled:${owner}`,legacyKey=`monkey-push-enabled:${owner}`
+    const enabled=localStorage.getItem(enabledKey)??localStorage.getItem(legacyKey)
+    if(enabled==='true'&&!localStorage.getItem(enabledKey))localStorage.setItem(enabledKey,'true')
+    if(enabled!=='true')return
     const info=await callNotificationService({action:'config'});if(!info.publicKey)return
     const key=Uint8Array.from(atob(info.publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))
     sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key})
   }
   await callNotificationService({action:'subscribe',subscription:sub.toJSON(),...deviceInfo()})
   await bindOwner(reg,owner)
-  localStorage.setItem(`monkey-push-enabled:${owner}`,'true')
+  localStorage.setItem(`yardbook-push-enabled:${owner}`,'true')
 }

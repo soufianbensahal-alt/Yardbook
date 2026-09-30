@@ -10,11 +10,11 @@ import type { FleetState, PrivateFile } from '../types'
 export type BackupProgress = { percent:number; label:string }
 export type BackupProgressHandler = (progress:BackupProgress)=>void
 const dateStamp=(now:Date)=>`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-export const administrativeBackupFilename=(now=new Date())=>`Monkey-Rentals-Backup-${dateStamp(now)}.zip`
+export const administrativeBackupFilename=(now=new Date())=>`Yardbook-Backup-${dateStamp(now)}.zip`
 const clean=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,100)||'Sin nombre'
 const extension=(name:string,mime='')=>{const found=name.match(/\.([a-zA-Z0-9]{2,5})$/)?.[1];if(found)return found.toLowerCase();if(mime==='application/pdf')return'pdf';if(mime.includes('png'))return'png';if(mime.includes('jpeg'))return'jpg';return'webp'}
 const text=(value?:string):CellObject=>({type:String,value:value||'',wrap:true})
-const header=(labels:string[]):Row=>labels.map(value=>({...text(value),fontWeight:'bold',backgroundColor:'#F97316',textColor:'#FFFFFF',height:32}))
+const header=(labels:string[]):Row=>labels.map(value=>({...text(value),fontWeight:'bold',backgroundColor:'#F56B2A',textColor:'#FFFFFF',height:32}))
 const simpleSheet=(name:string,labels:string[],rows:Array<Array<string|number>>):Sheet<Blob>&{data:Row[]}=>({sheet:name,showGridLines:false,stickyRowsCount:1,columns:labels.map((label,index)=>({width:Math.min(45,Math.max(16,label.length+2,...rows.slice(0,200).map(row=>String(row[index]??'').length+2)))})),data:[header(labels),...(rows.length?rows.map(row=>row.map(value=>typeof value==='number'?{type:Number,value}:{...text(String(value)),height:30})): [[text('Sin registros')]])]})
 
 async function workbookBlob(sheets:ReportSheet[]|Array<Sheet<Blob>&{data:Row[]}>) {
@@ -27,7 +27,7 @@ function downloadBlob(blob:Blob,name:string){const url=URL.createObjectURL(blob)
 export async function createAdministrativeBackup(state:FleetState,ownerId:string|null,onProgress:BackupProgressHandler=()=>{},now=new Date()) {
   if(!ownerId)throw new Error('Inicia sesión para crear una copia administrativa.')
   const [{default:JSZip}]=await Promise.all([import('jszip')])
-  const zip=new JSZip(),root=zip.folder(`Monkey Rentals Backup - ${dateStamp(now)}`)!
+  const zip=new JSZip(),root=zip.folder(`Yardbook Backup - ${dateStamp(now)}`)!
   const errors:string[]=[],seen=new Set<string>(),today=dateStamp(now)
   const reportSheets=buildReportWorkbook(state,today,state.adminSettings.name||state.adminSettings.email)
   const movements=economicMovements(state,today)
@@ -62,8 +62,8 @@ export async function createAdministrativeBackup(state:FleetState,ownerId:string
   await addWorkbook('Informes/resumen.xlsx',byName('Resumen','Gastos','Últimos movimientos'))
   const settings=state.adminSettings,report=buildReport(state,today)
   await addWorkbook('Configuración/configuracion.xlsx',[simpleSheet('Configuración',['Configuración','Valor'],[['Empresa',settings.company],['Responsable',settings.name],['Email',settings.email],['Teléfono',settings.phone],['Alertas activadas',settings.notifications?.enabled?'Sí':'No'],['Categorías de alerta',(settings.notifications?.categories||[]).join(', ')],['Zona horaria',settings.notifications?.timezone||'Europe/Madrid'],['Ingresos cobrados',report.summary.totalPaid],['Gastos del mes',report.summary.monthExpenses]])])
-  root.file('LEEME.txt',`COPIA ADMINISTRATIVA DE MONKEY RENTALS\nGenerada: ${now.toLocaleString('es-ES')}\n\nLos archivos Excel y adjuntos pueden abrirse sin la aplicación. Esta copia contiene información privada y debe guardarse en un lugar seguro. La restauración automática de la app sigue utilizando la copia técnica JSON disponible en Configuración.`)
-  root.file('Copia técnica/monkey-rentals-backup.json',JSON.stringify(createBackup(state,ownerId,now),null,2))
+  root.file('LEEME.txt',`COPIA ADMINISTRATIVA DE YARDBOOK\nGenerada: ${now.toLocaleString('es-ES')}\n\nLos archivos Excel y adjuntos pueden abrirse sin la aplicación. Esta copia contiene información privada y debe guardarse en un lugar seguro. La restauración automática de la app sigue utilizando la copia técnica JSON disponible en Configuración.`)
+  root.file('Copia técnica/yardbook-backup.json',JSON.stringify(createBackup(state,ownerId,now),null,2))
   if(errors.length)root.file('errores_backup.txt',`La copia se completó, pero algunos elementos no pudieron incluirse:\n\n${errors.join('\n')}`)
   onProgress({percent:90,label:'Comprimiendo archivos'})
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},metadata=>onProgress({percent:90+Math.round(metadata.percent/10),label:'Comprimiendo archivos'}))

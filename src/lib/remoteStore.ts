@@ -22,20 +22,25 @@ export interface RemoteMeta {
   user_id?: string
 }
 
-export const REMOTE_SESSION_KEY = 'monkey-rentals:supabase-session'
-export const REMOTE_REMEMBER_KEY = 'monkey-rentals:remember-session'
+export const REMOTE_SESSION_KEY = 'yardbook:supabase-session'
+export const REMOTE_REMEMBER_KEY = 'yardbook:remember-session'
+const LEGACY_REMOTE_SESSION_KEY = 'monkey-rentals:supabase-session'
+const LEGACY_REMOTE_REMEMBER_KEY = 'monkey-rentals:remember-session'
 
 const env = import.meta.env
 const config = {
   url: String(env.VITE_SUPABASE_URL || '').replace(/\/$/, ''),
   anonKey: String(env.VITE_SUPABASE_ANON_KEY || ''),
-  table: String(env.VITE_MONKEY_STATE_TABLE || 'fleet_state'),
+  table: String(env.VITE_YARDBOOK_STATE_TABLE || env.VITE_MONKEY_STATE_TABLE || 'fleet_state'),
 }
 
 export const remoteEnabled = Boolean(config.url && config.anonKey)
 
 export function getRememberRemoteSession() {
-  return localStorage.getItem(REMOTE_REMEMBER_KEY) !== 'false'
+  const current=localStorage.getItem(REMOTE_REMEMBER_KEY)
+  const legacy=localStorage.getItem(LEGACY_REMOTE_REMEMBER_KEY)
+  if(current===null && legacy!==null)localStorage.setItem(REMOTE_REMEMBER_KEY,legacy)
+  return (current ?? legacy) !== 'false'
 }
 
 export function setRememberRemoteSession(remember: boolean) {
@@ -69,7 +74,9 @@ function ownerQuery(session: RemoteSession) {
 
 export function readRemoteSession(): RemoteSession | null {
   try {
-    const stored = getRememberRemoteSession() ? localStorage.getItem(REMOTE_SESSION_KEY) : sessionStorage.getItem(REMOTE_SESSION_KEY)
+    const storage=getRememberRemoteSession()?localStorage:sessionStorage
+    let stored=storage.getItem(REMOTE_SESSION_KEY)
+    if(!stored){stored=storage.getItem(LEGACY_REMOTE_SESSION_KEY);if(stored)storage.setItem(REMOTE_SESSION_KEY,stored)}
     if (!stored) return null
     const session = JSON.parse(stored) as RemoteSession
     const userId = getRemoteOwnerId(session)

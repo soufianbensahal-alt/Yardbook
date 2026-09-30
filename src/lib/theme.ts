@@ -1,10 +1,11 @@
 export type Theme = 'light' | 'dark'
 export type ThemeMode = Theme | 'system'
 
-export const THEME_KEY = 'monkey-rentals-theme'
-export const LOGIN_THEME_KEY = 'monkey-rentals-login-theme'
+export const THEME_KEY = 'yardbook-theme'
+export const LOGIN_THEME_KEY = 'yardbook-login-theme'
+const readMigrated=(key:string,legacy:string)=>{const current=localStorage.getItem(key);const value=current??localStorage.getItem(legacy);if(current===null&&value!==null)localStorage.setItem(key,value);return value}
 
-export function getSavedTheme(): Theme { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light' }
+export function getSavedTheme(): Theme { return readMigrated(THEME_KEY,'monkey-rentals-theme') === 'dark' ? 'dark' : 'light' }
 
 export function getSystemTheme(): Theme {
   if (typeof window === 'undefined' || !window.matchMedia) return 'light'
@@ -12,7 +13,7 @@ export function getSystemTheme(): Theme {
 }
 
 export function getSavedLoginThemeMode(): ThemeMode {
-  const stored = localStorage.getItem(LOGIN_THEME_KEY)
+  const stored = readMigrated(LOGIN_THEME_KEY,'monkey-rentals-login-theme')
   return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
 }
 
