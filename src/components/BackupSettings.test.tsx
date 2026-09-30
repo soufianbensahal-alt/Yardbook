@@ -6,6 +6,12 @@ import { emptyState } from '../data/emptyState'
 const mock=vi.hoisted(()=>({ownerId:'user-a' as string|null,restore:vi.fn()}))
 vi.mock('../store/FleetContext',()=>({useFleet:()=>({state:emptyState,ownerId:mock.ownerId,syncStatus:'online',restoreFromBackup:mock.restore})}))
 beforeEach(()=>{localStorage.clear();mock.ownerId='user-a';mock.restore.mockReset()})
+it('presenta la copia administrativa ZIP como acción principal',()=>{
+  render(<BackupSettings/>)
+  expect(screen.getByRole('button',{name:'Descargar copia administrativa ZIP'})).toBeInTheDocument()
+  expect(screen.getByText(/Excels separados para clientes/)).toBeInTheDocument()
+  expect(screen.getByText('Opciones técnicas y restauración')).toBeInTheDocument()
+})
 it('exige revisar y confirmar antes de restaurar',async()=>{
   render(<BackupSettings/>)
   const json=JSON.stringify(createBackup(emptyState,'user-a'))
