@@ -182,7 +182,7 @@ export function AppLayout() {
     </aside>
 
     <div className="min-w-0 flex-1">
-      <header className="sticky top-0 z-20 flex min-h-18 items-center gap-3 border-b border-orange-100 bg-white/95 px-4 backdrop-blur-xl sm:px-6 md:min-h-20 md:px-8">
+      <header className="app-header sticky top-0 z-20 flex min-h-18 items-center gap-3 border-b border-orange-100 bg-white/95 px-4 backdrop-blur-xl sm:px-6 md:min-h-20 md:px-8">
         <NavLink to="/app/calendario" className={({ isActive }) => `mobile-calendar-shortcut md:hidden ${isActive ? 'mobile-calendar-shortcut-active' : ''}`} aria-label="Abrir calendario"><CalendarDays size={20}/></NavLink>
         <button className="icon-btn hidden shrink-0 md:inline-flex" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menú' : 'Alternar menú'} aria-expanded={!collapsed}><Menu/></button>
         <div className="min-w-0 flex-1">
