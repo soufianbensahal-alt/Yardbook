@@ -25,6 +25,10 @@
   "scripts": {
     "dev": "remotion studio",
     "render": "remotion render Yardbook out/yardbook-intro.mp4",
+    "render:mobile": "remotion render YardbookMobile out/yardbook-intro-mobile.mp4",
+    "render:mobile-tall": "remotion render YardbookMobileTall out/yardbook-intro-mobile-tall.mp4",
+    "render:tablet-portrait": "remotion render YardbookTabletPortrait out/yardbook-intro-tablet-portrait.mp4",
+    "render:tablet-landscape": "remotion render YardbookTabletLandscape out/yardbook-intro-tablet-landscape.mp4",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

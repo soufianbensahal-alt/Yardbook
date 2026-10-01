@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Yardbook</title>
+  <path fill="#F56B2A" d="M7 7h15l8 15v35H17V27L7 7Z"/>
+  <path fill="#F56B2A" d="M57 7H42l-8 15v35h13V27L57 7Z"/>
+</svg>

@@ -5,30 +5,59 @@ const REDUCED_MOTION_DURATION = 500
 
 export function AppIntro({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(true)
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window === 'undefined' ? 1024 : window.innerWidth,
+    height: typeof window === 'undefined' ? 768 : window.innerHeight,
+    coarse: typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches),
+  }))
   const [reducedMotion] = useState(() => typeof window !== 'undefined'
     && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches))
+  const aspect = viewport.height / Math.max(1, viewport.width)
+  const mobile = viewport.width <= 500
+  const tablet = viewport.coarse && viewport.width <= 1366
+  const motionSource = mobile
+    ? aspect > 1.94 ? '/yardbook-motion-mobile-tall.mp4' : '/yardbook-motion-mobile.mp4'
+    : tablet
+      ? aspect > 1.05 ? '/yardbook-motion-tablet-portrait.mp4' : aspect >= 0.56 ? '/yardbook-motion-tablet-landscape.mp4' : '/yardbook-motion.mp4'
+      : '/yardbook-motion.mp4'
   const finish = useCallback(() => setVisible(false), [])
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const updateViewport = () => setViewport({ width: window.innerWidth, height: window.innerHeight, coarse:Boolean(window.matchMedia?.('(pointer: coarse)').matches) })
+    window.addEventListener('resize', updateViewport, { passive: true })
+    window.addEventListener('orientationchange', updateViewport, { passive: true })
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('resize', updateViewport)
+      window.removeEventListener('orientationchange', updateViewport)
+    }
+  }, [])
 
   useEffect(() => {
     const timeout = window.setTimeout(finish, reducedMotion ? REDUCED_MOTION_DURATION : INTRO_DURATION)
     return () => window.clearTimeout(timeout)
-  }, [finish, reducedMotion])
+  }, [finish, reducedMotion, motionSource])
 
   return <>
     {children}
     {visible && <section className={`app-intro${reducedMotion ? ' app-intro-reduced' : ''}`} role="status" aria-label="Iniciando Yardbook">
-      <div className="app-intro-stage" aria-hidden="true">
-        <header className="app-intro-header">
-          <span>YARDBOOK <i>/</i> IDENTIDAD VISUAL</span>
-          <span>GESTIÓN DE FLOTAS</span>
-        </header>
-        <div className="app-intro-brand">
-          <img src="/yardbook-mark.svg" alt="" />
-          <span>yardbook</span>
-        </div>
-        <p className="app-intro-claim">Tu flota. Bajo control.</p>
-        <footer className="app-intro-footer">Un punto de encuentro para todos tus vehículos.</footer>
-      </div>
+      {reducedMotion
+        ? <div className="app-intro-static" aria-hidden="true"><img src="/yardbook-logo.svg" alt="" /></div>
+        : <video
+            key={motionSource}
+            className={`app-intro-video${mobile ? ' app-intro-video-mobile' : ''}`}
+            src={motionSource}
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            controls={false}
+            disablePictureInPicture
+            onEnded={finish}
+            aria-hidden="true"
+          />}
     </section>}
   </>
 }

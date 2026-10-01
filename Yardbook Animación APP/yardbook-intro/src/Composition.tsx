@@ -1,16 +1,16 @@
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
 const colors = {
-  cream: "#f7efdc",
-  creamLight: "#fff9ea",
-  petrol: "#073f4a",
-  petrolDark: "#032f39",
-  petrolSoft: "#0d7380",
-  orange: "#f58a13",
-  orangeDeep: "#e96f0d",
-  ink: "#092f38",
-  muted: "#7e866e",
-  white: "#fffaf0",
+  cream: "#F5F3EC",
+  creamLight: "#FBFAF6",
+  petrol: "#202623",
+  petrolDark: "#202623",
+  petrolSoft: "#66736C",
+  orange: "#F56B2A",
+  orangeDeep: "#D9571D",
+  ink: "#202623",
+  muted: "#66706A",
+  white: "#F5F3EC",
 };
 
 const clamp = {
@@ -281,7 +281,7 @@ export const YardbookIntro = () => {
           }}
         >
           <Img
-            src={staticFile("yardbook-logo-light.svg")}
+            src={staticFile("yardbook-logo.svg")}
             style={{
               position: "absolute",
               inset: 0,
@@ -317,6 +317,59 @@ export const YardbookIntro = () => {
               }}
             />
           </div>
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+export const YardbookIntroMobile = () => {
+  const frame = useCurrentFrame();
+  const { fps, width, height } = useVideoConfig();
+  const enter = eased(frame, [0, 0.55 * fps], [0, 1]);
+  const brandExit = interpolate(frame, [3.7 * fps, 4.35 * fps], [0, 1], {
+    ...clamp,
+    easing: Easing.inOut(Easing.cubic),
+  });
+  const dashboardEnter = eased(frame, [3.95 * fps, 4.55 * fps], [0, 1]);
+  const logoY = interpolate(brandExit, [0, 1], [0, -height * 0.15], clamp);
+  const logoScale = interpolate(enter, [0, 1], [0.84, 1], clamp) * interpolate(brandExit, [0, 1], [1, 0.72], clamp);
+  const glintX = interpolate(frame, [0.35 * fps, 1.3 * fps], [-width * 0.42, width * 0.42], clamp);
+  const dashboardY = interpolate(dashboardEnter, [0, 1], [height * 0.12, 0], clamp);
+
+  return (
+    <AbsoluteFill style={{ overflow: "hidden", background: colors.cream, color: colors.ink, fontFamily: "Inter, Arial, sans-serif" }}>
+      <AbsoluteFill style={{ padding: "8% 8% 7%", opacity: dashboardEnter, transform: `translateY(${dashboardY}px)` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 22, fontSize: 26, fontWeight: 800 }}>
+          <Img src={staticFile("yardbook-mark.svg")} style={{ width: 42, height: 42 }} />
+          <span>yardbook</span>
+        </div>
+        <div style={{ marginTop: 44, fontSize: 22, fontWeight: 700, color: colors.muted }}>GESTIÓN DE FLOTAS</div>
+        <div style={{ marginTop: 10, fontSize: 46, fontWeight: 850, letterSpacing: -2 }}>Tu flota. Bajo control.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginTop: 42 }}>
+          {[["Vehículos", "12", colors.orange], ["Disponibles", "08", colors.petrol], ["Reservas hoy", "04", colors.petrol], ["Pendientes", "02", colors.orangeDeep]].map(([label, value, accent]) => (
+            <div key={label} style={{ minHeight: 142, padding: 24, borderRadius: 22, background: colors.creamLight, boxShadow: "0 14px 38px rgba(32,38,35,.08)" }}>
+              <div style={{ fontSize: 20, color: colors.muted, fontWeight: 650 }}>{label}</div>
+              <div style={{ marginTop: 14, fontSize: 52, fontWeight: 850, color: accent }}>{value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 26, padding: 24, borderRadius: 22, background: colors.petrol, color: colors.cream }}>
+          <div style={{ fontSize: 21, fontWeight: 750 }}>Todo tu equipo, en un solo lugar</div>
+          <div style={{ marginTop: 10, fontSize: 18, opacity: .78 }}>Alquileres · Mantenimiento · Cobros</div>
+        </div>
+      </AbsoluteFill>
+
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: "8% 8% 12%", opacity: 1 - dashboardEnter * 0.08 }}>
+        <div style={{ width: "100%", maxWidth: width * 0.84, transform: `translateY(${logoY}px) scale(${logoScale})`, opacity: 1 - brandExit * 0.18 }}>
+          <Img src={staticFile("yardbook-logo.svg")} style={{ display: "block", width: "100%", height: "auto", filter: `drop-shadow(0 20px 40px rgba(32,38,35,${0.12 + enter * 0.08}))` }} />
+        </div>
+        <div style={{ position: "absolute", top: "60%", left: 0, right: 0, textAlign: "center", transform: `translateY(${logoY * 0.42}px)`, opacity: 1 - brandExit }}>
+          <div style={{ fontSize: "4.4%", letterSpacing: ".16em", fontWeight: 750, color: colors.muted }}>TU FLOTA. BAJO CONTROL.</div>
+          <div style={{ width: "46%", height: 5, margin: "34px auto 0", borderRadius: 5, background: colors.orange, transform: `scaleX(${interpolate(frame, [0.2 * fps, 1.1 * fps], [0, 1], clamp)})`, transformOrigin: "left" }} />
+        </div>
+        <div style={{ position: "absolute", top: "43%", left: "8%", width: "84%", height: 4, overflow: "hidden", opacity: (1 - brandExit) * 0.4 }}>
+          <div style={{ width: "28%", height: "100%", background: `linear-gradient(90deg, transparent, ${colors.orange}, transparent)`, transform: `translateX(${glintX}px)` }} />
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
