@@ -10,6 +10,8 @@ describe('AppIntro', () => {
     render(<AppIntro><main>Aplicacion</main></AppIntro>)
 
     expect(screen.getByRole('status', { name:'Iniciando Yardbook' })).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Saltar introducción/i)).not.toBeInTheDocument()
     act(() => vi.advanceTimersByTime(6500))
     expect(screen.queryByRole('status', { name:'Iniciando Yardbook' })).not.toBeInTheDocument()
     expect(screen.getByText('Aplicacion')).toBeInTheDocument()
