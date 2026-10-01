@@ -5,6 +5,7 @@ import { AppIntro } from './AppIntro'
 describe('AppIntro', () => {
   afterEach(() => {
     vi.useRealTimers()
+    delete document.documentElement.dataset.theme
     Object.defineProperty(window, 'innerWidth', { configurable:true, value:1024 })
     Object.defineProperty(window, 'innerHeight', { configurable:true, value:768 })
   })
@@ -34,5 +35,16 @@ describe('AppIntro', () => {
     Object.defineProperty(window, 'innerHeight', { configurable:true, value:667 })
     render(<AppIntro><main>Aplicacion</main></AppIntro>)
     expect(document.querySelector('video')).toHaveAttribute('src', '/yardbook-motion-mobile.mp4')
+  })
+
+  it('usa el motion oscuro cuando la interfaz está en modo oscuro', () => {
+    vi.useFakeTimers()
+    document.documentElement.dataset.theme = 'dark'
+    Object.defineProperty(window, 'innerWidth', { configurable:true, value:390 })
+    Object.defineProperty(window, 'innerHeight', { configurable:true, value:844 })
+
+    render(<AppIntro><main>Aplicacion</main></AppIntro>)
+
+    expect(document.querySelector('video')).toHaveAttribute('src', '/yardbook-motion-mobile-tall-dark.mp4')
   })
 })

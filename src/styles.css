@@ -271,6 +271,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .app-intro-video-mobile { background:#F5F3EC; }
 .app-intro-static { position:absolute; inset:0; display:grid; place-items:center; padding:max(1.5rem,env(safe-area-inset-top)) max(1.5rem,env(safe-area-inset-right)) max(1.5rem,env(safe-area-inset-bottom)) max(1.5rem,env(safe-area-inset-left)); background:#F5F3EC; }
 .app-intro-static img { display:block; width:min(72vw,32rem); height:auto; }
+:root[data-theme="dark"] .app-intro,
+:root[data-theme="dark"] .app-intro-video,
+:root[data-theme="dark"] .app-intro-video-mobile,
+:root[data-theme="dark"] .app-intro-static { background:#0f0f0f; }
 @keyframes app-intro-enter { from { opacity:0; } to { opacity:1; } }
 @media (max-width:639px) {
   .app-header { padding-top:env(safe-area-inset-top); padding-right:calc(1rem + env(safe-area-inset-right)); padding-left:calc(1rem + env(safe-area-inset-left)); }
