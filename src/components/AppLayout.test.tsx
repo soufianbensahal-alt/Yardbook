@@ -56,6 +56,16 @@ describe('AppLayout navigation',()=>{
     expect(mobileNav).not.toHaveTextContent('Calendario')
   })
 
+  it('define el contenido principal como el área de scroll bajo la cabecera fija',()=>{
+    setDesktop(false)
+    const {container}=renderLayout()
+    const shell=container.querySelector('.app-layout')
+    const main=screen.getByRole('main')
+    expect(shell).toBeInTheDocument()
+    expect(main).toHaveClass('app-content-scroll','pb-32')
+    expect(screen.getByRole('banner')).toHaveClass('app-header')
+  })
+
   it('abre y cierra el panel de notificaciones móvil por encima de la navegación',()=>{
     setDesktop(false)
     renderLayout()

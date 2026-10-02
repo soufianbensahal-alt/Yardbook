@@ -18,9 +18,11 @@ describe('AppIntro', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByText(/Saltar introducción/i)).not.toBeInTheDocument()
     expect(document.querySelector('video')).toHaveAttribute('src', '/yardbook-motion.mp4')
+    expect(document.body.style.overflow).toBe('hidden')
     act(() => vi.advanceTimersByTime(6500))
     expect(screen.queryByRole('status', { name:'Iniciando Yardbook' })).not.toBeInTheDocument()
     expect(screen.getByText('Aplicacion')).toBeInTheDocument()
+    expect(document.body.style.overflow).toBe('')
   })
 
   it('selecciona el motion vertical de acuerdo con la proporción de pantalla', () => {

@@ -165,7 +165,7 @@ export function AppLayout() {
     </nav>
   </>,document.body)
 
-  return <div className="min-h-dvh bg-cream md:flex">
+  return <div className="app-layout min-h-dvh bg-cream md:flex">
     <a href="#main-content" className="skip-link">Saltar al contenido</a>
     <aside className={`app-sidebar hidden h-dvh flex-col border-r border-white/10 bg-ink text-white md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
       <div className={`flex h-20 items-center border-b border-white/10 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}><Brand compact={collapsed} light/></div>
@@ -203,7 +203,7 @@ export function AppLayout() {
           <button className="text-xs font-bold text-stone-500 hover:text-brand-600" onClick={signOut}>Salir</button>
         </div>}
       </header>
-      <main id="main-content" className="p-4 pb-32 sm:p-6 sm:pb-32 md:p-8"><Outlet/></main>
+      <main id="main-content" className="app-content-scroll p-4 pb-32 sm:p-6 sm:pb-32 md:p-8"><Outlet/></main>
     </div>
 
     {mobileNavigationLayer}

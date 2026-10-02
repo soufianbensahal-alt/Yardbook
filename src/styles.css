@@ -253,7 +253,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .mobile-more-sheet, .mobile-calendar-shortcut, button[aria-label="Cerrar más opciones"] { display:block !important; }
   .mobile-calendar-shortcut { display:grid !important; }
   .mobile-calendar-shortcut + .icon-btn { display:none !important; }
-  #main-content { padding-bottom:8rem !important; }
+  #main-content { padding-bottom:calc(8rem + env(safe-area-inset-bottom)) !important; }
+}
+@media (max-width:767px) {
+  .app-layout { display:flex; height:100vh; height:100dvh; min-height:0; flex-direction:column; overflow:hidden; }
+  .app-layout > .min-w-0.flex-1 { display:flex; min-height:0; flex-direction:column; }
+  .app-layout .app-header { position:relative; top:auto; flex:0 0 auto; }
+  .app-layout .app-content-scroll { min-height:0; flex:1 1 auto; overflow-x:hidden; overflow-y:auto; overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; }
 }
 @media (max-width:639px) {
   .search-field { padding-right:4.25rem; }

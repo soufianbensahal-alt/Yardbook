@@ -26,17 +26,24 @@ export function AppIntro({ children }: { children: ReactNode }) {
   const finish = useCallback(() => setVisible(false), [])
 
   useEffect(() => {
+    if (!visible) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [visible])
+
+  useEffect(() => {
+    if (!visible) return
     const updateViewport = () => setViewport({ width: window.innerWidth, height: window.innerHeight, coarse:Boolean(window.matchMedia?.('(pointer: coarse)').matches) })
     window.addEventListener('resize', updateViewport, { passive: true })
     window.addEventListener('orientationchange', updateViewport, { passive: true })
     return () => {
-      document.body.style.overflow = previousOverflow
       window.removeEventListener('resize', updateViewport)
       window.removeEventListener('orientationchange', updateViewport)
     }
-  }, [])
+  }, [visible])
 
   useEffect(() => {
     const root = document.documentElement
