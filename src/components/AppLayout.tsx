@@ -167,18 +167,18 @@ export function AppLayout() {
 
   return <div className="app-layout min-h-dvh bg-cream md:flex">
     <a href="#main-content" className="skip-link">Saltar al contenido</a>
-    <aside className={`app-sidebar hidden h-dvh flex-col border-r border-white/10 bg-ink text-white md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
-      <div className={`flex h-20 items-center border-b border-white/10 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}><Brand compact={collapsed} light/></div>
+    <aside className={`app-sidebar hidden h-dvh flex-col md:sticky md:top-0 md:flex ${collapsed ? 'md:w-[88px]' : 'md:w-[276px]'} transition-[width] duration-300`}>
+      <div className={`sidebar-header flex h-20 items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}><Brand compact={collapsed}/></div>
       <nav className="flex-1 overflow-y-auto p-3" aria-label="Navegación principal">
         {desktopNav.map(({ to, label, icon: Icon, end }) => <NavLink
           key={to}
           to={to}
           end={end}
           title={collapsed ? label : undefined}
-          className={({ isActive }) => `sidebar-link mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'sidebar-link-active bg-brand-500 text-white shadow-md shadow-orange-200' : 'text-stone-300 hover:bg-white/10 hover:text-white'} ${collapsed ? 'justify-center' : ''}`}
+          className={({ isActive }) => `sidebar-link relative mb-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'sidebar-link-active' : ''} ${collapsed ? 'justify-center' : ''}`}
         ><Icon size={20}/><span className={collapsed ? 'hidden' : ''}>{label}</span></NavLink>)}
       </nav>
-      <button className="sidebar-collapse m-3 flex size-11 items-center justify-center self-center rounded-xl border border-white/15 text-stone-300 hover:bg-white/10" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}>{collapsed ? <ChevronRight/> : <ChevronLeft/>}</button>
+      <button className="sidebar-collapse m-3 flex size-11 items-center justify-center self-center rounded-xl border transition" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}>{collapsed ? <ChevronRight/> : <ChevronLeft/>}</button>
     </aside>
 
     <div className="min-w-0 flex-1">

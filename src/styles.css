@@ -293,5 +293,21 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .skip-link { position:fixed; z-index:2000; left:1rem; top:1rem; transform:translateY(-180%); border-radius:.75rem; background:#202623; color:#fff; padding:.75rem 1rem; font-weight:800; }
 .skip-link:focus { transform:translateY(0); }
 .card { border-color:var(--app-border); background:var(--app-surface); box-shadow:0 12px 34px rgba(32,38,35,.07); }
-.app-sidebar { background:#202623 !important; }
+/* Sidebar claro */
+.app-sidebar { background:rgba(255,255,255,.72); -webkit-backdrop-filter:blur(20px) saturate(1.6); backdrop-filter:blur(20px) saturate(1.6); border-right:1px solid #EAEAEA; color:#3A3A3C; }
+.app-sidebar .sidebar-header { border-bottom:1px solid #EAEAEA; }
+.sidebar-link { color:#3A3A3C; }
+.sidebar-link svg { color:#6E6E73; transition:color .15s ease; }
+.sidebar-link:hover { background:#F0F0F2; }
+.sidebar-link:hover svg { color:#3A3A3C; }
+.sidebar-link-active, .sidebar-link-active:hover { background:rgba(245,107,42,.11); color:#B84417; }
+.sidebar-link-active svg, .sidebar-link-active:hover svg { color:#D9571D; }
+.sidebar-link-active::before { content:""; position:absolute; left:0; top:50%; width:3px; height:1.25rem; transform:translateY(-50%); border-radius:0 3px 3px 0; background:#F56B2A; }
+.sidebar-collapse { border-color:#EAEAEA; background:transparent; color:#6E6E73; }
+.sidebar-collapse:hover { background:#F0F0F2; color:#3A3A3C; }
+:root[data-theme="dark"] .app-sidebar { color:#e7e5e4; -webkit-backdrop-filter:none; backdrop-filter:none; }
+:root[data-theme="dark"] .app-sidebar .sidebar-header { border-color:#2a2a2a; }
+:root[data-theme="dark"] .sidebar-link svg { color:inherit; }
+:root[data-theme="dark"] .sidebar-collapse { border-color:#2a2a2a; color:#cfcfcf; }
+:root[data-theme="dark"] .sidebar-link-active::before { display:none; }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; } }
